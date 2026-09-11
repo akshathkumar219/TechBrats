@@ -9,11 +9,13 @@ import { Editor } from './components/Editor'
 import { StatusBar } from './components/StatusBar'
 import { Backlinks } from './components/Backlinks'
 import { PromptModal } from './components/PromptModal'
+import { QuickSwitcher } from './components/QuickSwitcher'
 
 export function App() {
   const [isPreviewOnly, setIsPreviewOnly] = useState(false)
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
+  const [isQuickSwitcherOpen, setIsQuickSwitcherOpen] = useState(false)
 
   const {
     vaultName, files, folders, activeFile, content,
@@ -30,9 +32,13 @@ export function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'e') {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'e') {
         e.preventDefault()
         setIsPreviewOnly((prev) => !prev)
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'o') {
+        e.preventDefault()
+        setIsQuickSwitcherOpen((prev) => !prev)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -48,10 +54,7 @@ export function App() {
     return (
       <div className="browser-unsupported">
         <h2>Chrome or Edge Required</h2>
-        <p>
-          SyndicateBrain relies on the File System Access API to read and write notes directly on disk.
-          This feature is currently supported in Google Chrome and Microsoft Edge.
-        </p>
+        <p>SyndicateBrain relies on the File System Access API supported in Google Chrome and Microsoft Edge.</p>
       </div>
     )
   }
@@ -107,7 +110,13 @@ export function App() {
         />
       </div>
 
-      {/* Dialog for New Note */}
+      <QuickSwitcher
+        isOpen={isQuickSwitcherOpen}
+        files={files}
+        onSelectFile={selectFile}
+        onClose={() => setIsQuickSwitcherOpen(false)}
+      />
+
       <PromptModal
         isOpen={isNoteModalOpen}
         title="Create New Note"
@@ -118,7 +127,6 @@ export function App() {
         onClose={() => setIsNoteModalOpen(false)}
       />
 
-      {/* Dialog for New Folder */}
       <PromptModal
         isOpen={isFolderModalOpen}
         title="Create New Folder"
@@ -128,12 +136,9 @@ export function App() {
         onClose={() => setIsFolderModalOpen(false)}
       />
 
-      {/* Window too small guard below 1280px */}
       <div className="window-too-small">
         <h2>Desktop Window Too Small</h2>
-        <p>
-          SyndicateBrain requires a minimum viewport width of 1280px to display all investigation panes. Please expand your browser window.
-        </p>
+        <p>SyndicateBrain requires a minimum viewport width of 1280px to display all investigation panes.</p>
       </div>
     </>
   )

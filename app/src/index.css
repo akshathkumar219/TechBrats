@@ -881,3 +881,78 @@ pre, code {
   color: var(--text-muted);
   text-align: center;
 }
+
+/* Quick Switcher Modal (Step 12) */
+.quick-switcher-box {
+  background-color: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  width: 560px;
+  max-width: 90vw;
+  max-height: 480px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.quick-switcher-input {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: var(--s3);
+  font-size: var(--fs-md);
+  background-color: transparent;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.quick-switcher-input:focus {
+  border-color: var(--accent);
+}
+
+.quick-switcher-list {
+  overflow-y: auto;
+  max-height: 380px;
+  padding: var(--s2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quick-switcher-item {
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+
+.quick-switcher-item:hover,
+.quick-switcher-item.selected {
+  background-color: var(--bg-active);
+}
+
+.quick-switcher-name {
+  font-size: var(--fs-base);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.quick-switcher-item.selected .quick-switcher-name {
+  color: var(--accent);
+}
+
+.quick-switcher-path {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.quick-switcher-empty {
+  padding: var(--s4);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  text-align: center;
+}
