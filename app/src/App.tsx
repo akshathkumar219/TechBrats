@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { fsSupported, pickVault, walkVault, readFile, type VaultFile } from './fs/vault'
+import { fsSupported } from './fs/vault'
+import { useVault } from './state/useVault'
 import { TitleBar } from './components/TitleBar'
 import { FileTree } from './components/FileTree'
 import { Editor } from './components/Editor'
@@ -7,13 +8,19 @@ import { StatusBar } from './components/StatusBar'
 
 export function App() {
   const [isPreviewOnly, setIsPreviewOnly] = useState(false)
-  const [vaultName, setVaultName] = useState<string | null>(null)
-  const [files, setFiles] = useState<VaultFile[]>([])
-  const [selectedPath, setSelectedPath] = useState<string | null>(null)
-  const [activeFile, setActiveFile] = useState<VaultFile | null>(null)
-  const [content, setContent] = useState<string>('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+
+  const {
+    vaultName,
+    files,
+    activeFile,
+    content,
+    saveStatus,
+    isLoading,
+    error,
+    openVault,
+    selectFile,
+    updateContent,
+  } = useVault()
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -25,38 +32,6 @@ export function App() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
-
-  const handleOpenFolder = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      const handle = await pickVault()
-      const vaultFiles = await walkVault(handle)
-      setVaultName(handle.name)
-      setFiles(vaultFiles)
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        return
-      }
-      setError(err instanceof Error ? err.message : 'Failed to open directory')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleSelectFile = async (path: string) => {
-    const file = files.find((f) => f.path === path)
-    if (!file) return
-    try {
-      setError(null)
-      const text = await readFile(file.handle)
-      setActiveFile(file)
-      setSelectedPath(file.path)
-      setContent(text)
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to read file')
-    }
-  }
 
   const wordCount = useMemo(() => {
     const trimmed = content.trim()
@@ -82,24 +57,24 @@ export function App() {
         <TitleBar
           vaultName={vaultName}
           isLoading={isLoading}
-          onOpenFolder={handleOpenFolder}
+          onOpenFolder={openVault}
         />
 
         {/* 2. Left rail (240px) */}
         <FileTree
           files={files}
-          selectedPath={selectedPath}
-          onSelectFile={handleSelectFile}
+          selectedPath={activeFile?.path ?? null}
+          onSelectFile={selectFile}
           isLoading={isLoading}
           error={error}
         />
 
-        {/* 3. Centre (flex) - Split view */}
+        {/* 3. Centre (flex) - Split view with debounced autosave */}
         <Editor
           content={content}
           activeFile={activeFile}
           isPreviewOnly={isPreviewOnly}
-          onChange={setContent}
+          onChange={updateContent}
         />
 
         {/* 4. Right rail (320px) */}
@@ -128,7 +103,7 @@ export function App() {
         <StatusBar
           filePath={activeFile ? activeFile.path : (vaultName ? `${files.length} notes found` : null)}
           wordCount={wordCount}
-          saveStatus="saved"
+          saveStatus={saveStatus}
         />
       </div>
 
