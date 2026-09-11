@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import { renderMarkdown } from '../lib/markdown'
+import { parseFrontmatter } from '../lib/frontmatter'
+import { FrontmatterPanel } from './FrontmatterPanel'
 import type { VaultFile } from '../fs/vault'
 
 interface PreviewProps {
@@ -15,7 +17,8 @@ export function Preview({
   files = [],
   onNavigateWikiLink,
 }: PreviewProps) {
-  const html = useMemo(() => renderMarkdown(content, files), [content, files])
+  const { properties, body } = useMemo(() => parseFrontmatter(content), [content])
+  const html = useMemo(() => renderMarkdown(body, files), [body, files])
 
   const handleContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const link = (e.target as HTMLElement).closest('a.wiki-link')
@@ -46,11 +49,10 @@ export function Preview({
   return (
     <div className="preview-pane">
       <div className="pane-inner">
-        <div
-          className="preview-content markdown-body"
-          onClick={handleContentClick}
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
+        <div className="preview-content markdown-body" onClick={handleContentClick}>
+          <FrontmatterPanel properties={properties} />
+          <div dangerouslySetInnerHTML={{ __html: html }} />
+        </div>
       </div>
     </div>
   )

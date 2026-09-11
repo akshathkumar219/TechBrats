@@ -1170,3 +1170,104 @@ pre, code {
   color: var(--text-muted);
   text-align: center;
 }
+
+/* Frontmatter Properties Panel (Step 15) */
+.properties-panel {
+  margin-bottom: var(--s4);
+  background-color: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.properties-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--s2) var(--s3);
+  cursor: pointer;
+  user-select: none;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.properties-title {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.properties-chevron {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  width: 12px;
+}
+
+.properties-count {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  background-color: var(--bg-base);
+  padding: 1px 6px;
+  border-radius: var(--r-full);
+}
+
+.properties-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.property-row {
+  display: flex;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-xs);
+}
+
+.property-row:last-child {
+  border-bottom: none;
+}
+
+.property-key {
+  width: 140px;
+  min-width: 140px;
+  padding: var(--s2) var(--s3);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  border-right: 1px solid var(--border);
+  word-break: break-word;
+}
+
+.property-value {
+  flex: 1;
+  padding: var(--s2) var(--s3);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  word-break: break-word;
+}
+
+.property-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.property-tag {
+  background-color: var(--bg-surface);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+
+.property-scalar {
+  line-height: 1.5;
+  color: var(--text-body);
+}
