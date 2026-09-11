@@ -89,6 +89,7 @@ export function App() {
         <Editor
           content={content}
           activeFile={activeFile}
+          files={files}
           isPreviewOnly={isPreviewOnly}
           onChange={updateContent}
         />

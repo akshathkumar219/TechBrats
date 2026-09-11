@@ -5,10 +5,11 @@ import type { VaultFile } from '../fs/vault'
 interface PreviewProps {
   content: string
   activeFile: VaultFile | null
+  files?: VaultFile[]
 }
 
-export function Preview({ content, activeFile }: PreviewProps) {
-  const html = useMemo(() => renderMarkdown(content), [content])
+export function Preview({ content, activeFile, files = [] }: PreviewProps) {
+  const html = useMemo(() => renderMarkdown(content, files), [content, files])
 
   if (!activeFile) {
     return (

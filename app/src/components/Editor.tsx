@@ -5,6 +5,7 @@ import { Preview } from './Preview'
 interface EditorProps {
   content: string
   activeFile: VaultFile | null
+  files?: VaultFile[]
   isPreviewOnly: boolean
   onChange: (value: string) => void
 }
@@ -12,6 +13,7 @@ interface EditorProps {
 export function Editor({
   content,
   activeFile,
+  files = [],
   isPreviewOnly,
   onChange,
 }: EditorProps) {
@@ -38,7 +40,7 @@ export function Editor({
             />
           </div>
         </section>
-        <Preview content={content} activeFile={activeFile} />
+        <Preview content={content} activeFile={activeFile} files={files} />
       </div>
     </main>
   )

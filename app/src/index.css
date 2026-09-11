@@ -316,6 +316,40 @@ pre, code {
   text-underline-offset: 2px;
 }
 
+/* Wiki-links (Obsidian-style) */
+.wiki-link {
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+  padding: 0 2px;
+  transition: opacity var(--t-fast), background-color var(--t-fast), text-decoration var(--t-fast);
+}
+
+.wiki-link:hover {
+  text-decoration: underline;
+  background-color: var(--accent-bg);
+}
+
+.wiki-link-resolved {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.wiki-link-unresolved {
+  color: var(--accent);
+  opacity: 0.5;
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+}
+
+.wiki-link-unresolved:hover {
+  opacity: 0.85;
+  text-decoration: underline dashed;
+  background-color: var(--accent-bg);
+}
+
+
 /* Window too small guard */
 .window-too-small {
   display: none;
