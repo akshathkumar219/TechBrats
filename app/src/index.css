@@ -399,60 +399,84 @@ pre, code {
   background-color: var(--bg-raised);
 }
 
-/* Flat file list styles (Step 2) */
-.file-list {
+/* Collapsible Tree styles (Step 3) */
+.tree-container {
   display: flex;
   flex-direction: column;
-  padding: var(--s1) 0;
+  padding: var(--s1) var(--s1);
   overflow-y: auto;
+  user-select: none;
 }
 
-.file-item {
+.tree-row {
   display: flex;
   align-items: center;
-  gap: var(--s2);
-  padding: var(--s1) var(--s3);
+  gap: var(--s1);
+  padding: 3px var(--s2);
   color: var(--text-body);
   font-size: var(--fs-base);
   font-family: var(--font-ui);
-  text-decoration: none;
   cursor: pointer;
   border-radius: var(--r-sm);
-  margin: 1px var(--s1);
+  margin: 1px 0;
   border: 1px solid transparent;
   transition: background-color var(--t-fast), color var(--t-fast);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  user-select: none;
 }
 
-.file-item:hover {
+.tree-row:hover {
   background-color: var(--bg-raised);
   color: var(--text-primary);
 }
 
-.file-item.active {
+.tree-row.active {
   background-color: var(--accent-bg);
   color: var(--accent);
   border-color: var(--accent-dim);
 }
 
-.file-item-icon {
+.tree-chevron {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-muted);
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
+  font-size: var(--fs-xs);
+  transition: transform var(--t-fast);
 }
 
-.file-item.active .file-item-icon {
+.tree-chevron.open {
+  transform: rotate(90deg);
+}
+
+.tree-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--fs-sm);
+}
+
+.tree-row.active .tree-icon {
   color: var(--accent);
 }
 
-.file-item-name {
+.tree-label {
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
+}
+
+.tree-folder-count {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  margin-left: auto;
+  padding-left: var(--s1);
 }
 
 /* Browser unsupported fallback screen */

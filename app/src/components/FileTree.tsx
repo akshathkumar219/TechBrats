@@ -1,4 +1,7 @@
+import { useState, useMemo } from 'react'
 import type { VaultFile } from '../fs/vault'
+import { buildFileTree } from '../lib/tree'
+import { TreeItem } from './TreeItem'
 
 interface FileTreeProps {
   files: VaultFile[]
@@ -15,6 +18,22 @@ export function FileTree({
   isLoading,
   error,
 }: FileTreeProps) {
+  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
+
+  const tree = useMemo(() => buildFileTree(files), [files])
+
+  const handleToggleFolder = (folderPath: string) => {
+    setCollapsedPaths((prev) => {
+      const next = new Set(prev)
+      if (next.has(folderPath)) {
+        next.delete(folderPath)
+      } else {
+        next.add(folderPath)
+      }
+      return next
+    })
+  }
+
   return (
     <aside className="left">
       <div className="left-search-box">
@@ -39,22 +58,22 @@ export function FileTree({
         <div className="placeholder-content">
           <p>Scanning files...</p>
         </div>
-      ) : files.length === 0 ? (
+      ) : tree.length === 0 ? (
         <div className="placeholder-content">
           <p>Click &ldquo;Open folder&rdquo; to load a vault.</p>
         </div>
       ) : (
-        <div className="file-list">
-          {files.map((file) => (
-            <div
-              key={file.path}
-              className={`file-item ${selectedPath === file.path ? 'active' : ''}`}
-              onClick={() => onSelectFile(file.path)}
-              title={file.path}
-            >
-              <span className="file-item-icon">📄</span>
-              <span className="file-item-name">{file.path}</span>
-            </div>
+        <div className="tree-container">
+          {tree.map((node) => (
+            <TreeItem
+              key={node.path}
+              node={node}
+              depth={0}
+              selectedPath={selectedPath}
+              collapsedPaths={collapsedPaths}
+              onToggleFolder={handleToggleFolder}
+              onSelectFile={onSelectFile}
+            />
           ))}
         </div>
       )}
