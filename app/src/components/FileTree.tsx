@@ -5,6 +5,7 @@ import { TreeItem } from './TreeItem'
 
 interface FileTreeProps {
   files: VaultFile[]
+  folders?: string[]
   selectedPath: string | null
   reopenCandidateName?: string | null
   onSelectFile: (path: string) => void
@@ -15,6 +16,7 @@ interface FileTreeProps {
 
 export function FileTree({
   files,
+  folders = [],
   selectedPath,
   reopenCandidateName,
   onSelectFile,
@@ -24,7 +26,7 @@ export function FileTree({
 }: FileTreeProps) {
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
 
-  const tree = useMemo(() => buildFileTree(files), [files])
+  const tree = useMemo(() => buildFileTree(files, folders), [files, folders])
 
   const handleToggleFolder = (folderPath: string) => {
     setCollapsedPaths((prev) => {

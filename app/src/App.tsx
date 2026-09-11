@@ -5,13 +5,18 @@ import { TitleBar } from './components/TitleBar'
 import { FileTree } from './components/FileTree'
 import { Editor } from './components/Editor'
 import { StatusBar } from './components/StatusBar'
+import { Backlinks } from './components/Backlinks'
+import { PromptModal } from './components/PromptModal'
 
 export function App() {
   const [isPreviewOnly, setIsPreviewOnly] = useState(false)
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
+  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
 
   const {
     vaultName,
     files,
+    folders,
     activeFile,
     content,
     saveStatus,
@@ -21,6 +26,8 @@ export function App() {
     openVault,
     reopenVault,
     selectFile,
+    createNewNote,
+    createNewFolder,
     updateContent,
   } = useVault()
 
@@ -62,11 +69,14 @@ export function App() {
           reopenCandidateName={reopenCandidateName}
           onOpenFolder={openVault}
           onReopenVault={reopenVault}
+          onNewNote={() => setIsNoteModalOpen(true)}
+          onNewFolder={() => setIsFolderModalOpen(true)}
         />
 
         {/* 2. Left rail (240px) */}
         <FileTree
           files={files}
+          folders={folders}
           selectedPath={activeFile?.path ?? null}
           reopenCandidateName={reopenCandidateName}
           onSelectFile={selectFile}
@@ -84,26 +94,7 @@ export function App() {
         />
 
         {/* 4. Right rail (320px) */}
-        <aside className="right">
-          <div className="panel-header">
-            <span>Backlinks</span>
-          </div>
-          <div className="backlink-section">
-            <div className="backlink-section-title">
-              <span>Linked Mentions</span>
-              <span>0</span>
-            </div>
-          </div>
-          <div className="backlink-section">
-            <div className="backlink-section-title">
-              <span>Unlinked Mentions</span>
-              <span>0</span>
-            </div>
-          </div>
-          <div className="placeholder-content">
-            <p>Select a note to inspect incoming mentions.</p>
-          </div>
-        </aside>
+        <Backlinks />
 
         {/* 5. Status bar (24px) */}
         <StatusBar
@@ -112,6 +103,27 @@ export function App() {
           saveStatus={saveStatus}
         />
       </div>
+
+      {/* Dialog for New Note */}
+      <PromptModal
+        isOpen={isNoteModalOpen}
+        title="Create New Note"
+        placeholder="e.g. Suspects/Vikram Singh"
+        hint="Supports nested paths. The .md extension is added automatically."
+        confirmLabel="Create Note"
+        onConfirm={(path) => void createNewNote(path)}
+        onClose={() => setIsNoteModalOpen(false)}
+      />
+
+      {/* Dialog for New Folder */}
+      <PromptModal
+        isOpen={isFolderModalOpen}
+        title="Create New Folder"
+        placeholder="e.g. Cases/Sonipat Ring"
+        confirmLabel="Create Folder"
+        onConfirm={(path) => void createNewFolder(path)}
+        onClose={() => setIsFolderModalOpen(false)}
+      />
 
       {/* Window too small guard below 1280px */}
       <div className="window-too-small">
@@ -125,5 +137,6 @@ export function App() {
 }
 
 export default App
+
 
 

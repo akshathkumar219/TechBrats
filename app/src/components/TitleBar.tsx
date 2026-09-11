@@ -4,6 +4,8 @@ interface TitleBarProps {
   reopenCandidateName?: string | null
   onOpenFolder: () => void
   onReopenVault?: () => void
+  onNewNote?: () => void
+  onNewFolder?: () => void
 }
 
 export function TitleBar({
@@ -12,6 +14,8 @@ export function TitleBar({
   reopenCandidateName,
   onOpenFolder,
   onReopenVault,
+  onNewNote,
+  onNewFolder,
 }: TitleBarProps) {
   return (
     <header className="title">
@@ -22,10 +26,22 @@ export function TitleBar({
         </span>
       </div>
       <div className="title-actions">
-        <button type="button" className="btn" disabled={!vaultName}>
+        <button
+          type="button"
+          className="btn"
+          disabled={!vaultName}
+          onClick={onNewNote}
+          title="Create new note"
+        >
           + New note
         </button>
-        <button type="button" className="btn" disabled={!vaultName}>
+        <button
+          type="button"
+          className="btn"
+          disabled={!vaultName}
+          onClick={onNewFolder}
+          title="Create new folder"
+        >
           + New folder
         </button>
         {reopenCandidateName && !vaultName && onReopenVault && (

@@ -9,7 +9,7 @@ export interface TreeNode {
   file?: VaultFile
 }
 
-export function buildFileTree(files: VaultFile[]): TreeNode[] {
+export function buildFileTree(files: VaultFile[], folders: string[] = []): TreeNode[] {
   const root: TreeNode = {
     name: '',
     displayName: '',
@@ -58,6 +58,32 @@ export function buildFileTree(files: VaultFile[]): TreeNode[] {
         }
         current = folderNode
       }
+    }
+  }
+
+  for (const folderPath of folders) {
+    const parts = folderPath.split('/').filter(Boolean)
+    if (parts.some((p) => p.startsWith('.'))) continue
+
+    let current = root
+    let currentPath = ''
+
+    for (const part of parts) {
+      currentPath = currentPath ? `${currentPath}/${part}` : part
+      let folderNode = current.children.find(
+        (c) => c.isFolder && c.name === part
+      )
+      if (!folderNode) {
+        folderNode = {
+          name: part,
+          displayName: part,
+          path: currentPath,
+          isFolder: true,
+          children: [],
+        }
+        current.children.push(folderNode)
+      }
+      current = folderNode
     }
   }
 

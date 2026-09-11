@@ -58,3 +58,17 @@ export async function createNote(
   }
   return dir.getFileHandle(filename, { create: true })
 }
+
+// nested folder path like "Suspects/Unverified" — walk/create each segment
+export async function createFolder(
+  root: FileSystemDirectoryHandle,
+  path: string
+): Promise<FileSystemDirectoryHandle> {
+  const parts = path.split('/').filter(Boolean)
+  let dir = root
+  for (const part of parts) {
+    dir = await dir.getDirectoryHandle(part, { create: true })
+  }
+  return dir
+}
+

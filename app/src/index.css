@@ -624,4 +624,58 @@ pre, code {
   margin-bottom: var(--s4);
 }
 
+/* Modal dialog styles */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(11, 12, 14, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.modal-box {
+  background-color: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  padding: var(--s4);
+  width: 440px;
+  max-width: 90vw;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+}
+
+.modal-title {
+  font-size: var(--fs-md);
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-bottom: var(--s3);
+  font-family: var(--font-ui);
+}
+
+.modal-input {
+  width: 100%;
+  margin-bottom: var(--s2);
+  padding: var(--s2);
+  font-size: var(--fs-base);
+}
+
+.modal-hint {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  margin-bottom: var(--s3);
+  line-height: 1.4;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s2);
+}
+
+
 
