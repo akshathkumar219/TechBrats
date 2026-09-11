@@ -6,7 +6,9 @@ import { TreeItem } from './TreeItem'
 interface FileTreeProps {
   files: VaultFile[]
   selectedPath: string | null
+  reopenCandidateName?: string | null
   onSelectFile: (path: string) => void
+  onReopenVault?: () => void
   isLoading: boolean
   error: string | null
 }
@@ -14,7 +16,9 @@ interface FileTreeProps {
 export function FileTree({
   files,
   selectedPath,
+  reopenCandidateName,
   onSelectFile,
+  onReopenVault,
   isLoading,
   error,
 }: FileTreeProps) {
@@ -60,7 +64,21 @@ export function FileTree({
         </div>
       ) : tree.length === 0 ? (
         <div className="placeholder-content">
-          <p>Click &ldquo;Open folder&rdquo; to load a vault.</p>
+          {reopenCandidateName && onReopenVault ? (
+            <>
+              <p>Previous vault found: <strong>{reopenCandidateName}</strong></p>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={onReopenVault}
+                style={{ marginTop: 'var(--s2)' }}
+              >
+                Reopen &ldquo;{reopenCandidateName}&rdquo;
+              </button>
+            </>
+          ) : (
+            <p>Click &ldquo;Open folder&rdquo; to load a vault.</p>
+          )}
         </div>
       ) : (
         <div className="tree-container">

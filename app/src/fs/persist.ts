@@ -20,3 +20,15 @@ export async function restoreVault(): Promise<FileSystemDirectoryHandle | null> 
   }
   return null
 }
+
+export async function reopenStoredVault(
+  handle: FileSystemDirectoryHandle
+): Promise<FileSystemDirectoryHandle | null> {
+  const opts = { mode: 'readwrite' as const }
+  const status = await handle.requestPermission(opts)
+  if (status === 'granted') {
+    return handle
+  }
+  return null
+}
+

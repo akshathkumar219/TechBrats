@@ -1,61 +1,48 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import {
-  pickVault,
-  walkVault,
-  readFile,
-  writeFile,
-  type VaultFile,
-} from '../fs/vault'
+import { useState, useEffect, useCallback } from 'react'
+import { pickVault, walkVault, readFile, type VaultFile } from '../fs/vault'
+import { getStoredVaultHandle, restoreVault, reopenStoredVault } from '../fs/persist'
+import { useAutosave } from './useAutosave'
 
 export function useVault() {
   const [vaultHandle, setVaultHandle] = useState<FileSystemDirectoryHandle | null>(null)
   const [vaultName, setVaultName] = useState<string | null>(null)
   const [files, setFiles] = useState<VaultFile[]>([])
   const [activeFile, setActiveFile] = useState<VaultFile | null>(null)
-  const [content, setContent] = useState<string>('')
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved'>('saved')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reopenCandidate, setReopenCandidate] = useState<FileSystemDirectoryHandle | null>(null)
 
-  const timerRef = useRef<number | null>(null)
-  const unsavedRef = useRef<{ file: VaultFile; text: string } | null>(null)
+  const {
+    content,
+    setContent,
+    saveStatus,
+    setSaveStatus,
+    updateContent,
+    flushSave,
+  } = useAutosave(activeFile)
 
-  const flushSave = useCallback(async () => {
-    if (timerRef.current !== null) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-    if (unsavedRef.current) {
-      const { file, text } = unsavedRef.current
-      unsavedRef.current = null
+  // Boot check: restore if permission granted, or offer Reopen <folder>
+  useEffect(() => {
+    async function initRestore() {
       try {
-        await writeFile(file.handle, text)
-        setSaveStatus('saved')
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Failed to flush save')
-      }
-    }
-  }, [])
-
-  const scheduleSave = useCallback((file: VaultFile, text: string) => {
-    unsavedRef.current = { file, text }
-    setSaveStatus('unsaved')
-    if (timerRef.current !== null) {
-      clearTimeout(timerRef.current)
-    }
-    timerRef.current = window.setTimeout(async () => {
-      if (unsavedRef.current) {
-        const { file: targetFile, text: targetText } = unsavedRef.current
-        unsavedRef.current = null
-        timerRef.current = null
-        try {
-          await writeFile(targetFile.handle, targetText)
-          setSaveStatus('saved')
-        } catch (err: unknown) {
-          setError(err instanceof Error ? err.message : 'Autosave failed')
+        const stored = await getStoredVaultHandle()
+        if (!stored) return
+        const restored = await restoreVault()
+        if (restored) {
+          setIsLoading(true)
+          const vaultFiles = await walkVault(restored)
+          setVaultHandle(restored)
+          setVaultName(restored.name)
+          setFiles(vaultFiles)
+          setIsLoading(false)
+        } else {
+          setReopenCandidate(stored)
         }
+      } catch {
+        // Silently ignore boot restore errors
       }
-    }, 1000)
+    }
+    void initRestore()
   }, [])
 
   const openVault = useCallback(async () => {
@@ -67,26 +54,43 @@ export function useVault() {
       setVaultHandle(handle)
       setVaultName(handle.name)
       setFiles(vaultFiles)
+      setReopenCandidate(null)
     } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        return
-      }
+      if (err instanceof DOMException && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Failed to open directory')
     } finally {
       setIsLoading(false)
     }
   }, [])
 
+  const reopenVault = useCallback(async () => {
+    if (!reopenCandidate) return
+    try {
+      setIsLoading(true)
+      setError(null)
+      const handle = await reopenStoredVault(reopenCandidate)
+      if (handle) {
+        const vaultFiles = await walkVault(handle)
+        setVaultHandle(handle)
+        setVaultName(handle.name)
+        setFiles(vaultFiles)
+        setReopenCandidate(null)
+      } else {
+        setError('Permission not granted to open this folder')
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to reopen folder')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [reopenCandidate])
+
   const selectFile = useCallback(
     async (path: string) => {
       if (activeFile?.path === path) return
-
-      // Flush any pending unsaved work before switching
       await flushSave()
-
       const target = files.find((f) => f.path === path)
       if (!target) return
-
       try {
         setError(null)
         const text = await readFile(target.handle)
@@ -97,38 +101,8 @@ export function useVault() {
         setError(err instanceof Error ? err.message : 'Failed to read file')
       }
     },
-    [activeFile, files, flushSave]
+    [activeFile, files, flushSave, setContent, setSaveStatus]
   )
-
-  const updateContent = useCallback(
-    (newContent: string) => {
-      setContent(newContent)
-      if (activeFile) {
-        scheduleSave(activeFile, newContent)
-      }
-    },
-    [activeFile, scheduleSave]
-  )
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        void flushSave()
-      }
-    }
-    const handleBeforeUnload = () => {
-      void flushSave()
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('beforeunload', handleBeforeUnload)
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-      void flushSave()
-    }
-  }, [flushSave])
 
   return {
     vaultHandle,
@@ -139,7 +113,9 @@ export function useVault() {
     saveStatus,
     isLoading,
     error,
+    reopenCandidateName: reopenCandidate?.name ?? null,
     openVault,
+    reopenVault,
     selectFile,
     updateContent,
     flushSave,

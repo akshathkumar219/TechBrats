@@ -17,7 +17,9 @@ export function App() {
     saveStatus,
     isLoading,
     error,
+    reopenCandidateName,
     openVault,
+    reopenVault,
     selectFile,
     updateContent,
   } = useVault()
@@ -57,14 +59,18 @@ export function App() {
         <TitleBar
           vaultName={vaultName}
           isLoading={isLoading}
+          reopenCandidateName={reopenCandidateName}
           onOpenFolder={openVault}
+          onReopenVault={reopenVault}
         />
 
         {/* 2. Left rail (240px) */}
         <FileTree
           files={files}
           selectedPath={activeFile?.path ?? null}
+          reopenCandidateName={reopenCandidateName}
           onSelectFile={selectFile}
+          onReopenVault={reopenVault}
           isLoading={isLoading}
           error={error}
         />
