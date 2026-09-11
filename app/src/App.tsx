@@ -16,6 +16,7 @@ export function App() {
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
   const [isQuickSwitcherOpen, setIsQuickSwitcherOpen] = useState(false)
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false)
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
 
   const {
     vaultName, files, folders, activeFile, content,
@@ -30,12 +31,27 @@ export function App() {
     [activeFile, files, noteContents]
   )
 
+  const commands = useMemo(
+    () => [
+      { id: '1', label: 'Create new note', category: 'Note', action: () => setIsNoteModalOpen(true) },
+      { id: '2', label: 'Create new folder', category: 'Folder', action: () => setIsFolderModalOpen(true) },
+      { id: '3', label: 'Open note (Quick Switcher)...', category: 'Navigation', shortcut: '⌘O', action: () => setIsQuickSwitcherOpen(true) },
+      { id: '4', label: 'Search in all notes...', category: 'Search', shortcut: '⌘⇧F', action: () => setIsGlobalSearchOpen(true) },
+      { id: '5', label: isPreviewOnly ? 'Exit preview-only view' : 'Toggle live preview only', category: 'View', shortcut: '⌘E', action: () => setIsPreviewOnly((p) => !p) },
+      { id: '6', label: 'Open vault folder...', category: 'Vault', action: () => void openVault() },
+    ],
+    [isPreviewOnly, openVault]
+  )
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCmdOrCtrl = e.metaKey || e.ctrlKey
       if (isCmdOrCtrl && e.key.toLowerCase() === 'e') {
         e.preventDefault()
         setIsPreviewOnly((prev) => !prev)
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'p') {
+        e.preventDefault()
+        setIsCommandPaletteOpen((prev) => !prev)
       } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === 'f') {
         e.preventDefault()
         setIsGlobalSearchOpen((prev) => !prev)
@@ -67,42 +83,31 @@ export function App() {
       <div className="app">
         {/* 1. Title bar (40px) */}
         <TitleBar
-          vaultName={vaultName}
-          isLoading={isLoading}
+          vaultName={vaultName} isLoading={isLoading}
           reopenCandidateName={reopenCandidateName}
-          onOpenFolder={openVault}
-          onReopenVault={reopenVault}
+          onOpenFolder={openVault} onReopenVault={reopenVault}
           onNewNote={() => setIsNoteModalOpen(true)}
           onNewFolder={() => setIsFolderModalOpen(true)}
         />
 
         {/* 2. Left rail (240px) */}
         <FileTree
-          files={files}
-          folders={folders}
-          selectedPath={activeFile?.path ?? null}
+          files={files} folders={folders} selectedPath={activeFile?.path ?? null}
           reopenCandidateName={reopenCandidateName}
-          onSelectFile={selectFile}
-          onReopenVault={reopenVault}
-          isLoading={isLoading}
-          error={error}
+          onSelectFile={selectFile} onReopenVault={reopenVault}
+          isLoading={isLoading} error={error}
         />
 
         {/* 3. Centre (flex) - Split view with debounced autosave */}
         <Editor
-          content={content}
-          activeFile={activeFile}
-          files={files}
-          isPreviewOnly={isPreviewOnly}
-          onChange={updateContent}
+          content={content} activeFile={activeFile} files={files}
+          isPreviewOnly={isPreviewOnly} onChange={updateContent}
           onNavigateWikiLink={navigateWikiLink}
         />
 
         {/* 4. Right rail (320px) */}
         <Backlinks
-          activeFile={activeFile}
-          backlinks={backlinks}
-          onSelectFile={selectFile}
+          activeFile={activeFile} backlinks={backlinks} onSelectFile={selectFile}
         />
 
         {/* 5. Status bar (24px) */}
@@ -114,15 +119,18 @@ export function App() {
       </div>
 
       <AppModals
+        isCommandPaletteOpen={isCommandPaletteOpen}
         isQuickSwitcherOpen={isQuickSwitcherOpen}
         isGlobalSearchOpen={isGlobalSearchOpen}
         isNoteModalOpen={isNoteModalOpen}
         isFolderModalOpen={isFolderModalOpen}
+        commands={commands}
         files={files}
         noteContents={noteContents}
         onSelectFile={selectFile}
         onCreateNewNote={(path) => void createNewNote(path)}
         onCreateNewFolder={(path) => void createNewFolder(path)}
+        onCloseCommandPalette={() => setIsCommandPaletteOpen(false)}
         onCloseQuickSwitcher={() => setIsQuickSwitcherOpen(false)}
         onCloseGlobalSearch={() => setIsGlobalSearchOpen(false)}
         onCloseNoteModal={() => setIsNoteModalOpen(false)}
