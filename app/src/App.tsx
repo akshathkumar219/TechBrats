@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
-import { fsSupported, pickVault, walkVault, type VaultFile } from './fs/vault'
+import { useState, useEffect, useMemo } from 'react'
+import { fsSupported, pickVault, walkVault, readFile, type VaultFile } from './fs/vault'
 import { TitleBar } from './components/TitleBar'
 import { FileTree } from './components/FileTree'
+import { Editor } from './components/Editor'
 import { StatusBar } from './components/StatusBar'
 
 export function App() {
@@ -9,6 +10,8 @@ export function App() {
   const [vaultName, setVaultName] = useState<string | null>(null)
   const [files, setFiles] = useState<VaultFile[]>([])
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
+  const [activeFile, setActiveFile] = useState<VaultFile | null>(null)
+  const [content, setContent] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -41,6 +44,25 @@ export function App() {
     }
   }
 
+  const handleSelectFile = async (path: string) => {
+    const file = files.find((f) => f.path === path)
+    if (!file) return
+    try {
+      setError(null)
+      const text = await readFile(file.handle)
+      setActiveFile(file)
+      setSelectedPath(file.path)
+      setContent(text)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to read file')
+    }
+  }
+
+  const wordCount = useMemo(() => {
+    const trimmed = content.trim()
+    return trimmed ? trimmed.split(/\s+/).length : 0
+  }, [content])
+
   if (!fsSupported) {
     return (
       <div className="browser-unsupported">
@@ -67,35 +89,18 @@ export function App() {
         <FileTree
           files={files}
           selectedPath={selectedPath}
-          onSelectFile={(path) => setSelectedPath(path)}
+          onSelectFile={handleSelectFile}
           isLoading={isLoading}
           error={error}
         />
 
         {/* 3. Centre (flex) - Split view */}
-        <main className="center">
-          <div className={`center-split ${isPreviewOnly ? 'preview-only' : ''}`}>
-            <section className="editor-pane">
-              <div className="pane-inner">
-                <textarea
-                  className="editor-textarea"
-                  placeholder="Select a note from the left tree or create a new note..."
-                  readOnly
-                />
-              </div>
-            </section>
-            <section className="preview-pane">
-              <div className="pane-inner">
-                <div className="preview-content">
-                  <h1 className="note-h1">Investigation Workbench</h1>
-                  <p className="note-body">
-                    Markdown preview will render here. Toggle between raw and preview-only using <kbd>Cmd+E</kbd>.
-                  </p>
-                </div>
-              </div>
-            </section>
-          </div>
-        </main>
+        <Editor
+          content={content}
+          activeFile={activeFile}
+          isPreviewOnly={isPreviewOnly}
+          onChange={setContent}
+        />
 
         {/* 4. Right rail (320px) */}
         <aside className="right">
@@ -121,8 +126,8 @@ export function App() {
 
         {/* 5. Status bar (24px) */}
         <StatusBar
-          filePath={selectedPath ?? (vaultName ? `${files.length} notes found` : null)}
-          wordCount={0}
+          filePath={activeFile ? activeFile.path : (vaultName ? `${files.length} notes found` : null)}
+          wordCount={wordCount}
           saveStatus="saved"
         />
       </div>
