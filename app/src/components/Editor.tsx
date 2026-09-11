@@ -1,6 +1,8 @@
-import { type ChangeEvent } from 'react'
+import { useRef, type ChangeEvent, type MouseEvent, type KeyboardEvent } from 'react'
 import type { VaultFile } from '../fs/vault'
 import { Preview } from './Preview'
+import { WikiAutocomplete } from './WikiAutocomplete'
+import { useWikiAutocomplete } from '../state/useWikiAutocomplete'
 
 interface EditorProps {
   content: string
@@ -19,8 +21,32 @@ export function Editor({
   onChange,
   onNavigateWikiLink,
 }: EditorProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const {
+    isOpen,
+    candidates,
+    selectedIndex,
+    caretPos,
+    checkAutocomplete,
+    handleKeyDown,
+    handleSelectCandidate,
+    updateCaretPosition,
+  } = useWikiAutocomplete({ files, onChange, textareaRef })
+
   const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     onChange(e.target.value)
+    checkAutocomplete(e.target)
+  }
+
+  const handleClick = (e: MouseEvent<HTMLTextAreaElement>) => {
+    checkAutocomplete(e.currentTarget)
+  }
+
+  const handleKeyUp = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (['ArrowLeft', 'ArrowRight', 'Backspace', 'Delete'].includes(e.key)) {
+      checkAutocomplete(e.currentTarget)
+    }
   }
 
   return (
@@ -29,6 +55,7 @@ export function Editor({
         <section className="editor-pane">
           <div className="pane-inner">
             <textarea
+              ref={textareaRef}
               className="editor-textarea"
               placeholder={
                 activeFile
@@ -37,10 +64,22 @@ export function Editor({
               }
               value={content}
               onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onClick={handleClick}
+              onKeyUp={handleKeyUp}
+              onScroll={updateCaretPosition}
               disabled={!activeFile}
               spellCheck={false}
             />
           </div>
+          {isOpen && caretPos && (
+            <WikiAutocomplete
+              candidates={candidates}
+              selectedIndex={selectedIndex}
+              position={caretPos}
+              onSelect={handleSelectCandidate}
+            />
+          )}
         </section>
         <Preview
           content={content}
