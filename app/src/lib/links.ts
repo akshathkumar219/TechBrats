@@ -50,3 +50,61 @@ export function extractWikiLinks(content: string): WikiLinkMatch[] {
 
   return matches
 }
+
+export interface BacklinkOccurrence {
+  lineNumber: number
+  lineText: string
+  rawMatch: string
+}
+
+export interface BacklinkGroup {
+  sourceFile: VaultFile
+  occurrences: BacklinkOccurrence[]
+}
+
+export function findBacklinks(
+  activeFile: VaultFile | null,
+  files: VaultFile[],
+  contents: Record<string, string>
+): BacklinkGroup[] {
+  if (!activeFile) return []
+
+  const targetPath = activeFile.path.toLowerCase().replace(/\.md$/, '')
+  const targetName = activeFile.name.toLowerCase().replace(/\.md$/, '')
+  const results: BacklinkGroup[] = []
+
+  for (const file of files) {
+    if (file.path === activeFile.path) continue
+    const text = contents[file.path]
+    if (!text) continue
+
+    const lines = text.split('\n')
+    const occurrences: BacklinkOccurrence[] = []
+
+    lines.forEach((line, idx) => {
+      const links = extractWikiLinks(line)
+      for (const link of links) {
+        const resolved = resolveWikiLink(link.target, files)
+        const normTarget = link.target.toLowerCase().replace(/\.md$/, '')
+        if (
+          (resolved && resolved.path === activeFile.path) ||
+          normTarget === targetPath ||
+          normTarget === targetName
+        ) {
+          occurrences.push({
+            lineNumber: idx + 1,
+            lineText: line.trim(),
+            rawMatch: link.raw,
+          })
+          break
+        }
+      }
+    })
+
+    if (occurrences.length > 0) {
+      results.push({ sourceFile: file, occurrences })
+    }
+  }
+
+  return results
+}

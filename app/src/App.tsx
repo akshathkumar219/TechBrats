@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { fsSupported } from './fs/vault'
 import { useVault } from './state/useVault'
+import { useNoteIndex } from './state/useNoteIndex'
+import { findBacklinks } from './lib/links'
 import { TitleBar } from './components/TitleBar'
 import { FileTree } from './components/FileTree'
 import { Editor } from './components/Editor'
@@ -14,23 +16,17 @@ export function App() {
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
 
   const {
-    vaultName,
-    files,
-    folders,
-    activeFile,
-    content,
-    saveStatus,
-    isLoading,
-    error,
-    reopenCandidateName,
-    openVault,
-    reopenVault,
-    selectFile,
-    createNewNote,
-    createNewFolder,
-    navigateWikiLink,
-    updateContent,
+    vaultName, files, folders, activeFile, content,
+    saveStatus, isLoading, error, reopenCandidateName,
+    openVault, reopenVault, selectFile, createNewNote,
+    createNewFolder, navigateWikiLink, updateContent,
   } = useVault()
+
+  const noteContents = useNoteIndex(files, activeFile, content)
+  const backlinks = useMemo(
+    () => findBacklinks(activeFile, files, noteContents),
+    [activeFile, files, noteContents]
+  )
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -97,7 +93,11 @@ export function App() {
         />
 
         {/* 4. Right rail (320px) */}
-        <Backlinks />
+        <Backlinks
+          activeFile={activeFile}
+          backlinks={backlinks}
+          onSelectFile={selectFile}
+        />
 
         {/* 5. Status bar (24px) */}
         <StatusBar

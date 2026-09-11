@@ -549,6 +549,124 @@ pre, code {
   background-color: var(--bg-raised);
 }
 
+.backlink-title-left {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.backlink-chevron {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  width: 12px;
+}
+
+.backlink-badge {
+  font-size: var(--fs-xs);
+  background-color: var(--bg-surface);
+  color: var(--text-muted);
+  padding: 1px 6px;
+  border-radius: var(--r-full);
+}
+
+.backlink-list {
+  display: flex;
+  flex-direction: column;
+  padding: var(--s2) 0;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.backlink-empty {
+  padding: var(--s3);
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  text-align: center;
+}
+
+.backlink-group {
+  margin-bottom: var(--s2);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--s2);
+}
+
+.backlink-group:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.backlink-group-header {
+  padding: var(--s1) var(--s3);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.backlink-group-header:hover {
+  background-color: var(--bg-hover);
+}
+
+.backlink-filename {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.backlink-group-header:hover .backlink-filename {
+  color: var(--accent);
+}
+
+.backlink-filepath {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+}
+
+.backlink-occurrences {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px var(--s3);
+}
+
+.backlink-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+  padding: var(--s1) var(--s2);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  background-color: var(--bg-raised);
+}
+
+.backlink-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.backlink-line-num {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  min-width: 18px;
+  text-align: right;
+}
+
+.backlink-line-text {
+  font-size: var(--fs-xs);
+  color: var(--text-body);
+  font-family: var(--font-mono);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.backlink-highlight {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* Collapsible Tree styles (Step 3) */
 .tree-container {
   display: flex;
