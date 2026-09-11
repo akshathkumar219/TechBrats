@@ -956,3 +956,129 @@ pre, code {
   color: var(--text-muted);
   text-align: center;
 }
+
+/* Global Search Modal (Step 13) */
+.global-search-box {
+  background-color: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  width: 620px;
+  max-width: 90vw;
+  max-height: 520px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.global-search-header {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding-right: var(--s3);
+}
+
+.global-search-input {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  padding: var(--s3);
+  font-size: var(--fs-md);
+  background-color: transparent;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.global-search-input:focus {
+  border-color: transparent;
+}
+
+.global-search-count {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  background-color: var(--bg-surface);
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+}
+
+.global-search-list {
+  overflow-y: auto;
+  max-height: 420px;
+  padding: var(--s2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.global-search-item {
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  user-select: none;
+  background-color: var(--bg-surface);
+}
+
+.global-search-item:hover,
+.global-search-item.selected {
+  background-color: var(--bg-active);
+}
+
+.global-search-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.global-search-filename {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.global-search-item.selected .global-search-filename {
+  color: var(--accent);
+}
+
+.global-search-path {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+}
+
+.global-search-item-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+}
+
+.global-search-line-num {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  min-width: 18px;
+  text-align: right;
+}
+
+.global-search-line-text {
+  font-size: var(--fs-xs);
+  color: var(--text-body);
+  font-family: var(--font-mono);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.global-search-highlight {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.global-search-empty {
+  padding: var(--s4);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  text-align: center;
+}

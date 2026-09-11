@@ -8,14 +8,14 @@ import { FileTree } from './components/FileTree'
 import { Editor } from './components/Editor'
 import { StatusBar } from './components/StatusBar'
 import { Backlinks } from './components/Backlinks'
-import { PromptModal } from './components/PromptModal'
-import { QuickSwitcher } from './components/QuickSwitcher'
+import { AppModals } from './components/AppModals'
 
 export function App() {
   const [isPreviewOnly, setIsPreviewOnly] = useState(false)
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
   const [isQuickSwitcherOpen, setIsQuickSwitcherOpen] = useState(false)
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false)
 
   const {
     vaultName, files, folders, activeFile, content,
@@ -36,6 +36,9 @@ export function App() {
       if (isCmdOrCtrl && e.key.toLowerCase() === 'e') {
         e.preventDefault()
         setIsPreviewOnly((prev) => !prev)
+      } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setIsGlobalSearchOpen((prev) => !prev)
       } else if (isCmdOrCtrl && e.key.toLowerCase() === 'o') {
         e.preventDefault()
         setIsQuickSwitcherOpen((prev) => !prev)
@@ -110,30 +113,20 @@ export function App() {
         />
       </div>
 
-      <QuickSwitcher
-        isOpen={isQuickSwitcherOpen}
+      <AppModals
+        isQuickSwitcherOpen={isQuickSwitcherOpen}
+        isGlobalSearchOpen={isGlobalSearchOpen}
+        isNoteModalOpen={isNoteModalOpen}
+        isFolderModalOpen={isFolderModalOpen}
         files={files}
+        noteContents={noteContents}
         onSelectFile={selectFile}
-        onClose={() => setIsQuickSwitcherOpen(false)}
-      />
-
-      <PromptModal
-        isOpen={isNoteModalOpen}
-        title="Create New Note"
-        placeholder="e.g. Suspects/Vikram Singh"
-        hint="Supports nested paths. The .md extension is added automatically."
-        confirmLabel="Create Note"
-        onConfirm={(path) => void createNewNote(path)}
-        onClose={() => setIsNoteModalOpen(false)}
-      />
-
-      <PromptModal
-        isOpen={isFolderModalOpen}
-        title="Create New Folder"
-        placeholder="e.g. Cases/Sonipat Ring"
-        confirmLabel="Create Folder"
-        onConfirm={(path) => void createNewFolder(path)}
-        onClose={() => setIsFolderModalOpen(false)}
+        onCreateNewNote={(path) => void createNewNote(path)}
+        onCreateNewFolder={(path) => void createNewFolder(path)}
+        onCloseQuickSwitcher={() => setIsQuickSwitcherOpen(false)}
+        onCloseGlobalSearch={() => setIsGlobalSearchOpen(false)}
+        onCloseNoteModal={() => setIsNoteModalOpen(false)}
+        onCloseFolderModal={() => setIsFolderModalOpen(false)}
       />
 
       <div className="window-too-small">
