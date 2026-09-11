@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { pickVault, walkVault, readFile, createNote, createFolder, type VaultFile } from '../fs/vault'
 import { getStoredVaultHandle, restoreVault, reopenStoredVault } from '../fs/persist'
+import { resolveWikiLink } from '../lib/links'
 import { useAutosave } from './useAutosave'
 
 export function useVault() {
@@ -124,23 +125,20 @@ export function useVault() {
     [vaultHandle]
   )
 
+  const navigateWikiLink = useCallback(
+    async (target: string) => {
+      const resolved = resolveWikiLink(target, files)
+      if (resolved) await selectFile(resolved.path)
+      else await createNewNote(target)
+    },
+    [files, selectFile, createNewNote]
+  )
+
   return {
-    vaultHandle,
-    vaultName,
-    files,
-    folders,
-    activeFile,
-    content,
-    saveStatus,
-    isLoading,
-    error,
+    vaultHandle, vaultName, files, folders, activeFile, content,
+    saveStatus, isLoading, error,
     reopenCandidateName: reopenCandidate?.name ?? null,
-    openVault,
-    reopenVault,
-    selectFile,
-    createNewNote,
-    createNewFolder,
-    updateContent,
-    flushSave,
+    openVault, reopenVault, selectFile, createNewNote, createNewFolder,
+    navigateWikiLink, updateContent, flushSave,
   }
 }

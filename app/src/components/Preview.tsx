@@ -6,10 +6,27 @@ interface PreviewProps {
   content: string
   activeFile: VaultFile | null
   files?: VaultFile[]
+  onNavigateWikiLink?: (target: string) => void
 }
 
-export function Preview({ content, activeFile, files = [] }: PreviewProps) {
+export function Preview({
+  content,
+  activeFile,
+  files = [],
+  onNavigateWikiLink,
+}: PreviewProps) {
   const html = useMemo(() => renderMarkdown(content, files), [content, files])
+
+  const handleContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const link = (e.target as HTMLElement).closest('a.wiki-link')
+    if (link) {
+      e.preventDefault()
+      const target = link.getAttribute('data-target')
+      if (target && onNavigateWikiLink) {
+        onNavigateWikiLink(target)
+      }
+    }
+  }
 
   if (!activeFile) {
     return (
@@ -31,9 +48,11 @@ export function Preview({ content, activeFile, files = [] }: PreviewProps) {
       <div className="pane-inner">
         <div
           className="preview-content markdown-body"
+          onClick={handleContentClick}
           dangerouslySetInnerHTML={{ __html: html }}
         />
       </div>
     </div>
   )
 }
+

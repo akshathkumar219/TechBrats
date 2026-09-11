@@ -28,6 +28,7 @@ export function App() {
     selectFile,
     createNewNote,
     createNewFolder,
+    navigateWikiLink,
     updateContent,
   } = useVault()
 
@@ -92,6 +93,7 @@ export function App() {
           files={files}
           isPreviewOnly={isPreviewOnly}
           onChange={updateContent}
+          onNavigateWikiLink={navigateWikiLink}
         />
 
         {/* 4. Right rail (320px) */}
@@ -138,6 +140,3 @@ export function App() {
 }
 
 export default App
-
-
-

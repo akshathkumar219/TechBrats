@@ -8,6 +8,7 @@ interface EditorProps {
   files?: VaultFile[]
   isPreviewOnly: boolean
   onChange: (value: string) => void
+  onNavigateWikiLink?: (target: string) => void
 }
 
 export function Editor({
@@ -16,6 +17,7 @@ export function Editor({
   files = [],
   isPreviewOnly,
   onChange,
+  onNavigateWikiLink,
 }: EditorProps) {
   const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     onChange(e.target.value)
@@ -40,7 +42,12 @@ export function Editor({
             />
           </div>
         </section>
-        <Preview content={content} activeFile={activeFile} files={files} />
+        <Preview
+          content={content}
+          activeFile={activeFile}
+          files={files}
+          onNavigateWikiLink={onNavigateWikiLink}
+        />
       </div>
     </main>
   )
