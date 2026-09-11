@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react'
+import { fsSupported, pickVault, walkVault, type VaultFile } from './fs/vault'
+import { TitleBar } from './components/TitleBar'
+import { FileTree } from './components/FileTree'
+import { StatusBar } from './components/StatusBar'
 
 export function App() {
   const [isPreviewOnly, setIsPreviewOnly] = useState(false)
+  const [vaultName, setVaultName] = useState<string | null>(null)
+  const [files, setFiles] = useState<VaultFile[]>([])
+  const [selectedPath, setSelectedPath] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -14,45 +23,54 @@ export function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  const handleOpenFolder = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const handle = await pickVault()
+      const vaultFiles = await walkVault(handle)
+      setVaultName(handle.name)
+      setFiles(vaultFiles)
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return
+      }
+      setError(err instanceof Error ? err.message : 'Failed to open directory')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (!fsSupported) {
+    return (
+      <div className="browser-unsupported">
+        <h2>Chrome or Edge Required</h2>
+        <p>
+          SyndicateBrain relies on the File System Access API to read and write notes directly on disk.
+          This feature is currently supported in Google Chrome and Microsoft Edge.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="app">
         {/* 1. Title bar (40px) */}
-        <header className="title">
-          <div className="vault-title">
-            <span>SyndicateBrain</span>
-            <span className="vault-badge">No Vault Loaded</span>
-          </div>
-          <div className="title-actions">
-            <button type="button" className="btn">
-              + New note
-            </button>
-            <button type="button" className="btn">
-              + New folder
-            </button>
-            <button type="button" className="btn btn-primary">
-              Open folder
-            </button>
-          </div>
-        </header>
+        <TitleBar
+          vaultName={vaultName}
+          isLoading={isLoading}
+          onOpenFolder={handleOpenFolder}
+        />
 
         {/* 2. Left rail (240px) */}
-        <aside className="left">
-          <div className="left-search-box">
-            <input
-              type="text"
-              className="input-search"
-              placeholder="Search notes..."
-              disabled
-            />
-          </div>
-          <div className="panel-header">
-            <span>Files</span>
-          </div>
-          <div className="placeholder-content">
-            <p>Open a folder to view notes.</p>
-          </div>
-        </aside>
+        <FileTree
+          files={files}
+          selectedPath={selectedPath}
+          onSelectFile={(path) => setSelectedPath(path)}
+          isLoading={isLoading}
+          error={error}
+        />
 
         {/* 3. Centre (flex) - Split view */}
         <main className="center">
@@ -102,18 +120,11 @@ export function App() {
         </aside>
 
         {/* 5. Status bar (24px) */}
-        <footer className="status">
-          <div className="status-item">
-            <span>No file selected</span>
-          </div>
-          <div className="status-item">
-            <span>0 words</span>
-          </div>
-          <div className="status-item">
-            <span className="status-indicator" />
-            <span>saved</span>
-          </div>
-        </footer>
+        <StatusBar
+          filePath={selectedPath ?? (vaultName ? `${files.length} notes found` : null)}
+          wordCount={0}
+          saveStatus="saved"
+        />
       </div>
 
       {/* Window too small guard below 1280px */}
@@ -128,4 +139,5 @@ export function App() {
 }
 
 export default App
+
 
