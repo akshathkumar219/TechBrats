@@ -1,93 +1,119 @@
-# HARLEEN — Frontend: Shell, Editor, Wiki-links, Search
+# HARLEEN — Frontend Shell, Case Tree, Proposal Panel
 
-**Your track:** the "Obsidian for police" claim. Everything a judge sees before the graph even loads.
-**Your clock:** 16 working hours.
-**Files you own exclusively:** `web/src/styles/`, `web/src/layout/`, `web/src/editor/`, `web/src/tree/`, `web/src/search/`
-**You depend on:** Akshath's `mocks.py` (W2). After that, nothing — you are never blocked on a backend person.
+**Read `docs/CASE_MODEL.md` first.**
+
+**Track:** everything a judge sees before the graph loads, plus the one panel
+that makes the AI trustworthy.
+**Clock:** 16 working hours.
+**You own exclusively:** `web/src/index.css`, `web/src/components/`,
+`web/src/editor/`, `web/src/lib/`, `web/src/state/`, `web/src/fs/`,
+`web/src/proposals/`, `web/public/`
+**Prompts:** HAR-T01 → T07, in `docs/BUILD_PROMPTS.md`
 
 ---
 
-## Why this track matters
+## Start here: your old roadmap is already built
 
-The product claim is *"Obsidian's muscle memory, purpose-built for a detective."* The graph proves the intelligence; **your track proves the claim.** If the editor feels like a real editor — links autocomplete, backlinks appear, search is instant — the whole product reads as a tool someone could actually work in. If it feels like a textarea, the graph looks like a science project bolted to a form.
+The editor shell, design tokens, three-pane layout, file tree, CodeMirror
+editor, live preview, wiki-link autocomplete, backlinks and global search all
+**exist and work** in `web/src/`. Akshath built them before the team formed.
 
-You have the least dependency and the most surface. That means you set your own pace and you own the quality bar for the visual layer. Read `design-system.md` cover to cover in your first 20 minutes — a lot of your work is faithful transcription rather than invention, which is a gift: **the design decisions are already made, so spend your hours on execution quality instead of deliberation.**
+You are not rebuilding any of it. You **own** it now, and your track is the ten
+hours of work that turns it from a working editor into a demo-grade product —
+plus the Proposal panel, which is new and is the most important UI in the build.
 
 ---
 
 ## Roadmap
 
-### W0–2 · Foundation
+### W0–1 · Fonts and the token audit
 
-- [ ] Vite + React + TypeScript + Tailwind. `npm ci` from the pre-warmed cache — do **not** hit the network.
-- [ ] **`web/src/styles/tokens.css`** — every token from `design-system.md §1` as a CSS custom property. All of them, including the ones nothing uses yet. Colours, type scale, spacing, radii, shadows, the edge-status palette.
-  - Tailwind config reads from these vars, not from hardcoded hex. One place to change a colour; every component follows.
-  - **Nobody in the room is allowed to write a hex code after this lands.** If someone needs a colour that isn't a token, they ask you and you add the token.
-- [ ] Fonts from the USB kit, self-hosted: Inter, JetBrains Mono, Noto Sans Devanagari. `@font-face` with `font-display: swap`. **Noto Devanagari is not optional** — half the FIR content is Devanagari and a fallback-font render looks broken on a projector.
-- [ ] Commit and push. Tell the room tokens are live.
+- [ ] Self-host Inter, JetBrains Mono, **Noto Sans Devanagari** from the USB kit
+      into `web/public/fonts/`. `font-display: swap`. Devanagari is not
+      optional — half the FIR content is Devanagari and a fallback render looks
+      broken on a projector.
+- [ ] Audit `web/src/` for hardcoded hex, px sizes and spacing outside
+      `index.css`. Replace with the existing tokens. **Nobody writes a hex code
+      after this lands.** If someone needs a colour that isn't a token, they ask
+      you and you add it.
 
-### W2–5 · Three-pane shell — `web/src/layout/`
+### W1–3 · Case-folder tree
 
-- [ ] Layout per `design-system.md §2`: left rail (vault tree) · centre (editor or canvas) · right rail (inspector / backlinks / centrality)
-- [ ] Title bar: case name, vault path, offline indicator
-- [ ] Status bar: vault hash status (Shourya's endpoint feeds this — mock it until W8), doc count, node/edge count
-- [ ] Rails collapsible, widths draggable, widths persisted in `localStorage`
-- [ ] Desktop-only guard: below 1280px show a clean "SyndicateBrain requires a desktop display" panel. Don't build responsive — it's a police workstation tool and saying so is a feature.
-- [ ] **Pane-swap without remount.** The centre pane switches between editor and graph canvas. Akshath's Cytoscape instance must survive that switch — if the canvas remounts, layout re-runs and the graph jumps. Keep both mounted, toggle visibility with `hidden`.
+- [ ] The left rail now shows **cases**, not one flat vault:
+      `Case_01_.../`, `Case_02_.../`, each containing the numbered subfolders
+      from `CASE_MODEL.md` §3.
+- [ ] Type icons per folder. Person rows show `role:` from frontmatter as a
+      small badge — accused, witness, complainant. **Never invent a label the
+      record doesn't carry.**
+- [ ] Rails collapsible, widths draggable, persisted to `localStorage`.
+- [ ] Status bar: case name, evidence-verified state, note count, link count.
+- [ ] Desktop-only guard below 1280px. Don't build responsive — it's a police
+      workstation tool and saying so is a feature.
 
-> ⚠️ Talk to Akshath before you finalise the centre pane container. This is the one integration seam in your track and getting it wrong costs him an hour of perf debugging that isn't his fault.
+### W3–5 · The graph seam 🔴 talk to Akshath and AKTA first
 
-### W5–7 · Vault tree — `web/src/tree/`
+- [ ] The centre pane toggles between editor and AKTA's graph canvas
+      **without remounting either.** Keep both mounted, toggle with `hidden`.
+      If the canvas remounts, the layout re-runs and the graph jumps.
+- [ ] One stable container div the graph attaches to once, at mount, forever.
 
-- [ ] Tree from `/api/vault/tree` (mocked until Shourya's real one lands ~W9). Folder structure exactly as `blueprint.md §3` — `01_Evidence_Inbox/`, `Suspects/`, `Phones/`, `Locations/`, `Events/`, `Organisations/`, `Hypotheses/`
-- [ ] Type icons per `design-system.md §4`. Expand/collapse with state persisted.
-- [ ] **Read-only files render with a lock glyph and a muted row.** Files under `01_Evidence_Inbox/` are locked by Law 1 — showing that in the tree makes the guarantee visible before anyone clicks anything. Cheap, and it's a demo beat Akshath can point at.
-- [ ] Click opens in the editor. Active file highlighted.
+### W5–8 · Raw Inputs and the button
 
-### W7–11 · CodeMirror 6 editor — `web/src/editor/`
+- [ ] Drop zone on `00_Raw_Inputs/` → calls Shourya's `POST /api/ingest`.
+- [ ] Locked files render with a lock glyph and a muted row. Showing the
+      guarantee before anyone clicks is a demo beat Akshath will point at.
+- [ ] A write attempt on a locked file surfaces the refusal as a toast, not a
+      silent failure. Tone from `design-system.md` §7.
+- [ ] **The Analyse case button.** Prominent, one per case, calls
+      `POST /api/case/analyse`. Loading state that shows *which* agent is
+      running, not a spinner — on stage, visible work reads as capability.
 
-The biggest single piece of your track. Budget the full four hours.
+### W8–12 · 🏆 The Proposal panel — `web/src/proposals/`
 
-- [ ] `@uiw/react-codemirror`, markdown mode, `oneDark`-derived theme built from **your tokens**, not the stock palette
-- [ ] Live preview — headings, bold/italic, lists, code, blockquotes styled inline as you type (Obsidian's Live Preview model, not a split pane)
-- [ ] **Content column caps at 72ch, centred** (`design-system.md:96`). Full-window-width FIR narratives are exhausting to read and judges will be reading over your shoulder.
-- [ ] Devanagari and Latin in the same line must both look correct — mixed-script FIR narratives are the normal case here, not an edge case. Check line-height with a real code-mixed paragraph from Akshath's template early.
-- [ ] Save on blur + `Cmd/Ctrl+S`. Never lose a keystroke.
-- [ ] **Write attempts on a locked file surface the guard's refusal as a toast**, not a silent failure. Copy tone from `design-system.md §7`.
+The most important thing in your track. This is what turns the AI from a slop
+generator into an analyst with a human editor.
 
-### W11–14 · Wiki-links and backlinks — the thing that makes it feel real
+- [ ] Three sections from `AnalysisResult`: **New Connections**, **Files to
+      Update**, **Summary**.
+- [ ] Every proposed connection is a card: what it claims, why, the source file
+      and locator as a clickable chip, the model's confidence, and **Accept /
+      Reject**.
+- [ ] Accept calls `POST /api/proposal/{id}/accept` — Akshath's linker writes
+      the link. Reject logs it. The card animates out either way.
+- [ ] **Files to Update are read-only suggestions.** No accept button, no edit
+      button. Text saying what to add and where. The AI does not edit note
+      bodies and the UI must make that obvious.
+- [ ] A count of AI-added links somewhere visible, with a way to see them all.
 
-- [ ] **`[[` triggers autocomplete** over all vault note titles. Fuzzy match, keyboard-navigable, Enter inserts.
-- [ ] Rendered links styled per tokens; **click navigates**, and a link to a note that doesn't exist yet renders in the "unresolved" style (Obsidian's behaviour — and for a detective, an unresolved link is a genuinely useful signal that an entity is named but not yet worked up)
-- [ ] Alias syntax `[[Vikram Singh|the accused]]` — display text differs from target
-- [ ] **Backlinks pane** in the right rail: every note that links here, with the surrounding line as context. This is the single highest-value feature in your track for the demo — it's what makes the vault feel like an investigation rather than a folder.
+### W12–14 · `openFileAt` 🔴 blocks AKTA and Hermaine
 
-### W14–15 · Search
+- [ ] `openFileAt(path, line, span?)` — opens the file, scrolls to the line,
+      highlights the span. Works whether or not the file is open and whether or
+      not the editor is the visible pane.
+- [ ] A right-rail panel host so the copilot, the graph inspector and the
+      proposal panel mount without anyone editing your layout files.
+- [ ] **Ship this at W12.** AKTA and Hermaine both need it and neither has hours
+      at W15. Agree the signature with both before you build it.
 
-- [ ] Global search across note bodies. Debounced, results grouped by folder, match highlighted in context.
-- [ ] Plain substring + case-insensitive is enough. **Do not build fuzzy ranking** — nobody in a 5-minute demo will type a typo, and the hours are better spent on the polish pass below.
+### W14–16 · Polish 🔴 after feature freeze
 
-### W15–16 · Polish pass 🔴 after feature freeze
+Empty states for every pane, using Mehul's shared components. Loading
+skeletons, not spinners. Focus ring and hover state on every interactive
+element. Then walk the whole UI at 1920×1080 on the demo laptop and **list every
+misalignment before fixing any of them.**
 
-Feature freeze is at W13 — from there your job is making what exists look finished. This is not filler; on a projector it is most of what judges perceive.
-
-- [ ] Empty states for every pane: no vault open, empty folder, no backlinks, no search results. Copy tone from `design-system.md §7` — *"Named as accused in 3 FIRs"*, never *"High risk individual"*.
-- [ ] Loading skeletons, not spinners
-- [ ] Every interactive element has a visible focus ring and a hover state
-- [ ] Walk the whole UI at 1920×1080 **on the demo laptop** and fix every misalignment you find
+Copy tone throughout: *"Named as accused in 3 FIRs"*, never *"High risk
+individual."*
 
 ---
 
-## Cut to Future Scope — do not build these
+## Do not build
 
-Quick switcher (`Cmd+O`) · frontmatter-as-properties-panel · tag pane · graph-view-from-editor · light mode · outline pane · fuzzy search ranking
-
-We are not chasing feature count. **Six things that look and feel finished beat twelve that half-work** — everything above goes on the Future Scope slide as a deliberate decision.
-
----
+Light mode · responsive layouts · a tag pane · an outline pane · fuzzy search
+ranking · anything after W13.
 
 ## If you get ahead
 
-In rough order of value: (1) help AKTA with the Provenance Inspector — it's React and it's on the critical path; (2) take the Devanagari display-gloss side panel with its `MACHINE TRANSLATION — NOT A SOURCE` banner (`architecture.md:249`) — small, and it plays extremely well with a judging panel; (3) quick switcher.
-
-**Ask Akshath before starting any of them.** Do not add anything after W13.
+Ask Akshath first. In rough order of value: help Hermaine with the copilot
+panel; the Devanagari display-gloss side panel with its `MACHINE TRANSLATION —
+NOT A SOURCE` banner; graph-view-from-editor.

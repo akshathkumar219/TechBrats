@@ -1,92 +1,118 @@
-# AKTA — Entity Resolution + Provenance Inspector
+# AKTA — Graph View + Edge Inspector
 
-**Your track:** the two pieces of precision work in the build — making messy Indian names resolve into single entities, and making provenance clickable.
-**Your clock:** 16 working hours.
-**Files you own exclusively:** `brain/resolve/`, `web/src/inspector/`
-**You depend on:** Akshath's `schemas.py` + `mocks.py` (W2), Hermaine's `/api/edge/{id}/provenance` (W9 — you build against the mock until then)
-**Your AI tooling:** ask Akshath to share his Claude session for the phonetic-matching and normalisation work. It's the fiddliest logic in the project and worth the best model in the room.
+**Read `docs/CASE_MODEL.md` first**, especially §4 on link format.
 
----
-
-## Why this track matters, and why it's split across two stacks
-
-Your morning is Python and your afternoon is React. That's deliberate, not an accident of leftovers — both halves are **precision** work where the difficulty is in getting details exactly right rather than in volume, and that's a different skill from the two bulk-build tracks.
-
-**Entity resolution** is what makes the graph true. Real Indian police data has the same person as *Vikram Singh*, *Vikram Sing*, *विक्रम सिंह*, *V. Singh* and *Vicky*. Without resolution the graph has five nodes and the syndicate structure is invisible. Akshath has planted an alias pair in the synthetic data that resolves **only** via a shared IMEI — your resolver has to earn that one, and when it does, it's a demo beat.
-
-**The Provenance Inspector** is MDP item #3 — the thesis made clickable. Judges are told every edge points at a source; the inspector is the fifteen seconds where they *see* it. It's the most-looked-at panel in the right rail.
+**Track:** the visual half of the product — the button that turns a folder of
+notes into a network.
+**Clock:** 16 working hours.
+**You own exclusively:** `web/src/graph/`, `web/src/inspector/`
+**You depend on:** Akshath's `schemas.py` (W2). Nothing after that — you build
+against mocks until real notes exist.
+**Prompts:** AKT-T01 → T05, in `docs/BUILD_PROMPTS.md`
 
 ---
 
-## Roadmap — Part 1: Entity Resolution (`brain/resolve/`)
+## Why this track changed, and why it's yours
 
-### W2–5 · Blocking keys
+The entity-resolution pipeline you were going to own is gone — the model does
+most of that in-prompt now, and what's left is conservative identifier matching
+that lives in the agent layer. What replaced it is bigger and more visible: the
+graph is the demo's centrepiece, and it's the hardest frontend work in the
+build.
 
-Don't compare every name to every other name — 40 people is 780 comparisons and 4,000 is 8 million. Block first, compare only within blocks.
-
-- [ ] Hard blocking keys: shared phone number · shared IMEI · shared vehicle registration · same FIR + same role · first-initial + Soundex of surname
-- [ ] Two records only enter comparison if they share at least one block. Log block sizes — **any block with more than 50 members is a bad key** and will quietly cost you seconds per merge.
-- [ ] `GET /api/resolve/candidates` returning candidate pairs with their matching block
-
-### W5–10 · Three-stage matching 🔴 the core of your track
-
-This is the piece the storm report specifically called out: **naked Levenshtein is not good enough for Indian names** and that finding is why the pipeline has three stages.
-
-- [ ] **Stage 1 — normalisation.** Transliterate Devanagari → Latin (`indic-transliteration`). Strip honorifics: `Shri`, `Sh.`, `Smt.`, `Mr`, `S/o`, `W/o`, `alias`, `urf`. Collapse whitespace, casefold. Normalise the systematic variants: `Singh`/`Sing`, `Kumar`/`Kr`, `Mohammad`/`Mohd`/`Md`.
-- [ ] **Stage 2 — phonetics.** Double Metaphone, Indic-tuned. `Vikram`/`Bikram` must collide (v/b is a real Haryanvi variation, not a typo). `Rehan`/`Rehaan` must collide.
-- [ ] **Stage 3 — RapidFuzz** `token_set_ratio` on the normalised strings, only within a phonetic collision.
-- [ ] **🔴 No vector/embedding stage.** It was in the original spec and it is cut. `sentence-transformers` on CPU is slow, needs a model download, and adds a probabilistic step to the one part of the pipeline that most needs to be explainable in court. Three deterministic stages you can defend beat four where one is a black box.
-- [ ] Score fusion: `0.5 * phonetic + 0.3 * fuzzy + 0.2 * shared-context` (shared phones/vehicles/FIRs/co-accused). Thresholds go in `Case_Config.yaml`, not hardcoded.
-
-### W10–12 · Merge, log, reverse
-
-- [ ] Auto-merge above the high threshold. Between thresholds → flag as `needs_review` and **surface it in the UI as a count only**; the adjudication queue is cut.
-- [ ] **Every merge decision written to `brain/resolve/decisions.jsonl`:** both record IDs, every stage score, which block matched, the threshold used, timestamp. Nothing implicit.
-- [ ] **Every merge reversible.** Keep the original records; a merge writes a canonical-entity mapping, it never destroys a source row. Destroying a source row would violate Law 1.
-- [ ] `derivation_chain` field on the resolved entity — *"`Person_0031` merged from `Vikram Singh` (FIR_0142 p:2 l:9) + `Vicky` (CDR row:48219), matched on shared IMEI 8****"*. **Hermaine's certificate and your own inspector both render this** — agree the exact field shape with her at W2 and don't change it after.
-- [ ] **Verify against `data/GROUND_TRUTH.md` the moment Mehul's data lands.** The planted alias pair must merge, and it must merge *for the IMEI reason*. A merge that happens for the wrong reason is worse than no merge — it means your explanation on stage is false.
+**There is no graph database.** The vault is the database. You parse markdown
+notes and their wiki-links into a node/edge set and render it. That means the
+picture on stage is *provably* the same thing as the files on disk — there is no
+second store that can drift. It also means your parser is the only thing
+standing between a correct vault and a wrong graph.
 
 ---
 
-## Roadmap — Part 2: Provenance Inspector (`web/src/inspector/`)
+## Roadmap
 
-### W12–15 · The panel
+### W2–5 · `web/src/graph/parse.ts` — vault to graph
 
-Build the full mock in `design-system.md §5`. Faithfully — it's already designed, so this is execution, not invention.
+- [ ] Walk a case folder. Every entity note is a node: id, type, display name,
+      `role:` if present, all from frontmatter.
+- [ ] Every line in a note's `## Links` section is an edge. Parse the target,
+      the reason text, the `^[source locator]` citation, and the trailing
+      `<!-- ai:... -->` marker if there is one.
+- [ ] **An edge with no resolvable citation does not render.** Log it loudly
+      instead — a link without a source is a bug in whoever wrote it.
+- [ ] An unresolved wiki-link (target note doesn't exist) renders as a distinct
+      node style, not as an error. For a detective an unresolved link is a
+      useful signal: named but not yet worked up.
+- [ ] Pure function, no React, fully unit-testable. Write the tests.
 
-- [ ] Right-rail panel, opens on edge selection. Call Akshath's `setSelection` / listen to his selection event — **do not touch his engine file.**
-- [ ] Renders from `/api/edge/{id}/provenance`:
-  - Source doc: filename, type badge, **SHA-256 shown in a monospace token** — this is the trust signal, give it real visual weight
-  - Locator, as `page:3 line:11`
-  - **The raw source snippet**, monospace, ±2 lines of context, with the matched span highlighted. Raw text — not paraphrased, not translated, not cleaned. That rawness *is* the guarantee.
-  - The generating SQL, in a collapsible block with a copy button
-  - Derivation chain, if the edge involves a resolved entity
-- [ ] **Evidentiary status badge** — colours from `design-system.md §4`, the same palette Akshath's edge styles use, so a magenta dashed edge and a magenta badge visibly agree.
+### W5–9 · `web/src/graph/engine.ts` — Cytoscape
 
-### W15–16 · Open-source-at-locator 🔴 the beat
+- [ ] Cytoscape + `cose-bilkent`, **fixed layout seed.** Identical vault must
+      produce the identical picture every run. You will see this demoed five
+      times and judges notice if it jumps.
+- [ ] **Render budget before styling.** Target 2,000 nodes / 8,000 edges at
+      interactive pan-zoom: `hideEdgesOnViewport: true`,
+      `textureOnViewport: true`, `pixelRatio: 1`, default filter to top-N by
+      degree with everything else behind "show all". Benchmark on a generated
+      2,000-node fixture, not on the 20-node mock.
+- [ ] Imperative API so nobody else opens your file:
+      `focusNode(id)`, `applyFilter(pred)`, `setSelection(ids)`, `fitTo(ids)`,
+      plus a selection-change event others subscribe to.
+- [ ] Mount into Harleen's stable container **once**. Never remount — talk to
+      her about the seam at W3, not at W9.
 
-- [ ] Click the locator → opens that file in Harleen's editor, scrolls to the line, highlights the exact span.
-- [ ] **Coordinate with Harleen at W12, not W15.** You need a `openFileAt(path, line, span)` call on her editor. Ask her for it early; she has the hours at W12 and does not at W15. Don't reach into her files.
-- [ ] This is the single most persuasive fifteen seconds available to this project. *"Here is the claim. Here is the exact line in the original FIR it came from."* Judges nod at that.
+### W9–12 · Two edge classes 🔴 the thing that makes the AI honest
 
-### W16 · Polish 🔴 after feature freeze
+This is Law 2 made visible and it is not optional.
 
-- [ ] Empty state: nothing selected. Loading state. Error state: provenance missing → **say so loudly in red**, because an edge without provenance shouldn't exist and the UI should treat it as an alarm, not a blank.
+- [ ] **Record-derived edges** — parsed from a CDR row or an FIR line, written
+      by a human or by a deterministic rule. Solid, amber, full weight.
+- [ ] **AI-proposed edges** — carrying an `ai:` marker. Dashed, magenta,
+      visually distinct at a glance across a room.
+- [ ] A **Leads layer toggle** that hides every AI-derived edge. Pressing it on
+      stage and watching the graph thin out is a fifteen-second answer to "how
+      much of this did the machine make up?"
+- [ ] Colours from `design-system.md` §4, as tokens. AKTA's magenta edge and the
+      proposal card's magenta badge must visibly agree — same token, not two
+      similar hexes.
+
+### W12–15 · `web/src/inspector/` — click an edge
+
+- [ ] Right-rail panel, mounts into Harleen's panel host, opens on edge
+      selection.
+- [ ] Shows: the claim, the reason, the source file with its type badge, the
+      locator as `p:3 line:11` or `row:48219`, and **the raw source snippet**,
+      ±2 lines, monospace, matched span highlighted. Raw — not paraphrased, not
+      translated, not cleaned. The rawness is the guarantee.
+- [ ] Whether the edge is record-derived or AI-accepted, and if AI-accepted, who
+      accepted it and when.
+- [ ] Clicking the locator calls Harleen's `openFileAt(path, line, span)` —
+      opens the note, scrolls, highlights. **Agree the signature with her at
+      W12**, she has the hours then and not at W15.
+
+> *"Here is the connection. Here is the exact line in the original FIR it came
+> from."* That is the most persuasive fifteen seconds available to this project.
+
+### W15–16 · Focus mode and states 🔴 after freeze
+
+- [ ] `F` on a selected node dims everything more than one hop away. Escape
+      clears.
+- [ ] Empty: no case open. Empty: case has no links yet. Loading skeleton.
+      Error: parse failed, naming the file that broke it.
 
 ---
 
-## Cut to Future Scope — do not build these
+## Do not build
 
-Vector/embedding similarity stage · adjudication queue UI · fuzzy transliteration learning · cross-case entity linking · manual merge/split UI · contradiction detector
-
----
+A graph database · Leiden/CPM community hulls · a GNN hypothesis sandbox ·
+geospatial plotting · graph editing from the canvas (links are written by
+Akshath's linker, never by the UI) · a second layout algorithm.
 
 ## Priority order if you run short
 
-1. **Three-stage matching working on the planted alias pair** — without this the graph is provably wrong
-2. **Inspector rendering doc + locator + raw snippet** — MDP item #3
-3. Open-source-at-locator
-4. SQL block + derivation chain in the inspector
-5. Everything else
+1. Parser correct + graph renders from real notes
+2. Two edge classes visibly distinct + the Leads toggle
+3. Edge inspector with the raw snippet
+4. Click-through to the source line
+5. Focus mode
 
-If you're behind at W13, tell Akshath before he finds out at the W14 integration check.
+If you're behind at W13, tell Akshath before he finds out at the W14 check.
