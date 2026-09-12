@@ -4,6 +4,7 @@ import {
 import type React from 'react'
 import type { VaultFile } from '../fs/vault'
 import { StatusBar } from './StatusBar'
+import { TitleBar, type ActiveView } from './TitleBar'
 
 /* ------------------------------------------------------------------ *
  * Workspace — the Obsidian-style shell. One file, layout only.
@@ -197,8 +198,60 @@ const CSS = `
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ws-content { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; }
-.ws-content > .center { flex: 1 1 auto; min-width: 0; }
+/* ---- layout utilities & content hosts ---- */
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+
+.ws-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.ws-editor-host {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.ws-editor-host > .center {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+}
+.graph-canvas-host {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: var(--bg-void);
+  overflow: hidden;
+}
+.graph-canvas-host:empty::after {
+  content: 'Evidence Graph Canvas — Ready for Cytoscape engine';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  font-family: var(--font-mono);
+  pointer-events: none;
+}
+.ws-editor-host[hidden],
+.graph-canvas-host[hidden],
+[hidden] {
+  display: none !important;
+}
 
 .ws-empty {
   flex: 1 1 auto;
@@ -312,6 +365,7 @@ const I = {
   plus: 'M12 5v14|M5 12h14',
   x: 'M6 6l12 12|M18 6L6 18',
   copilot: 'M12 4a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-4a3 3 0 0 1 3-3h1V8a4 4 0 0 1 4-4z|M9.5 14h.01|M14.5 14h.01',
+  graph: 'M6 3a3 3 0 1 0 0 6 3 3 0 1 0 0-6|M18 3a3 3 0 1 0 0 6 3 3 0 1 0 0-6|M12 15a3 3 0 1 0 0 6 3 3 0 1 0 0-6|M9 6h6|M7.5 8.5l3 7|M16.5 8.5l-3 7',
   settings: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6|M4 12h2|M18 12h2|M12 4v2|M12 18v2',
   help: 'M9.5 9a2.5 2.5 0 1 1 3 2.5V13|M12 16.5h.01|M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18',
   send: 'M4 12l16-8-6 8 6 8z',
@@ -432,6 +486,10 @@ export interface WorkspaceProps {
   saveStatus: 'saved' | 'unsaved'
   sidebar: ReactNode
   editor: ReactNode
+  reopenCandidateName?: string | null
+  onReopenVault?: () => void
+  activeView?: ActiveView
+  onViewChange?: (view: ActiveView) => void
   onSelectFile: (path: string) => void
   onOpenVault: () => void
   onNewNote: () => void
@@ -468,6 +526,27 @@ export function Workspace(p: WorkspaceProps) {
     return 300
   })
   const [leftView, setLeftView] = useState<'files' | 'search' | 'bookmarks'>('files')
+  const [internalView, setInternalView] = useState<ActiveView>('editor')
+  const activeView = p.activeView ?? internalView
+  const setView = useCallback(
+    (v: ActiveView) => {
+      setInternalView(v)
+      p.onViewChange?.(v)
+    },
+    [p]
+  )
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'g') {
+        e.preventDefault()
+        setView(activeView === 'editor' ? 'graph' : 'editor')
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeView, setView])
 
   useEffect(() => {
     localStorage.setItem('sb_left_open', String(leftOpen))
@@ -572,11 +651,26 @@ export function Workspace(p: WorkspaceProps) {
     <div className="ws">
       <style>{CSS}</style>
 
+      <TitleBar
+        vaultName={p.vaultName}
+        isLoading={false}
+        reopenCandidateName={p.reopenCandidateName}
+        activeView={activeView}
+        onViewChange={setView}
+        onOpenFolder={p.onOpenVault}
+        onReopenVault={p.onReopenVault}
+        onNewNote={p.onNewNote}
+        onNewFolder={p.onNewFolder}
+      />
+
       <div className="ws-body">
         {/* ribbon */}
         <nav className="ws-ribbon">
           <IconBtn icon={I.files} label="Files" active={leftOpen && leftView === 'files'}
             onClick={() => { setLeftView('files'); setLeftOpen(true) }} />
+          <IconBtn icon={I.graph} label={activeView === 'graph' ? 'Show Editor (⌘G)' : 'Evidence Graph (⌘G)'}
+            active={activeView === 'graph'}
+            onClick={() => setView(activeView === 'graph' ? 'editor' : 'graph')} />
           <IconBtn icon={I.search} label="Search (⌘⇧F)" onClick={p.onSearch} />
           <IconBtn icon={I.bookmark} label="Bookmarks" active={leftOpen && leftView === 'bookmarks'}
             onClick={() => { setLeftView('bookmarks'); setLeftOpen(true) }} />
@@ -663,21 +757,37 @@ export function Workspace(p: WorkspaceProps) {
           </div>
 
           <div className="ws-notehead">
-            <IconBtn icon={I.back} label="Back" disabled={histAt <= 0} onClick={() => go(-1)} />
+            <IconBtn icon={I.back} label="Back" disabled={histAt <= 0 || activeView === 'graph'} onClick={() => go(-1)} />
             <IconBtn icon={I.forward} label="Forward"
-              disabled={histAt >= history.length - 1} onClick={() => go(1)} />
-            <span className="ws-notehead-title">{title}</span>
+              disabled={histAt >= history.length - 1 || activeView === 'graph'} onClick={() => go(1)} />
+            <span className="ws-notehead-title">
+              {activeView === 'graph' ? 'Evidence Graph — Entity & Co-occurrence Network' : title}
+            </span>
             <IconBtn icon={I.dots} label="More (not wired)" disabled />
           </div>
 
           <div className="ws-content">
-            {showEditor ? p.editor : (
-              <div className="ws-empty">
-                <button type="button" onClick={p.onNewNote}>Create new note</button>
-                <button type="button" onClick={p.onQuickSwitcher}>Go to file (⌘O)</button>
-                <button type="button" onClick={() => closeTab(current.id)}>Close</button>
-              </div>
-            )}
+            <div
+              id="editor-pane-container"
+              className="ws-editor-host w-full h-full"
+              hidden={activeView !== 'editor'}
+            >
+              {showEditor ? p.editor : (
+                <div className="ws-empty">
+                  <button type="button" onClick={p.onNewNote}>Create new note</button>
+                  <button type="button" onClick={p.onQuickSwitcher}>Go to file (⌘O)</button>
+                  <button type="button" onClick={() => closeTab(current.id)}>Close</button>
+                </div>
+              )}
+            </div>
+
+            <div
+              id="graph-canvas-container"
+              className="graph-canvas-host w-full h-full"
+              hidden={activeView !== 'graph'}
+              role="region"
+              aria-label="Evidence Graph Canvas"
+            />
           </div>
         </main>
 
