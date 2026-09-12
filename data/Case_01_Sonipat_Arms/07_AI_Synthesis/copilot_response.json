@@ -1,0 +1,24 @@
+{
+  "answer": "Vikram Singh is named as an accused in FIR 0142/2026 (Kharkhoda Thana) in connection with the illicit arms seizure on NH-44. ^[DOC_FIR_0142 p:2 l:9] CDR analysis confirms he operates as a proxy kingpin, maintaining 14 direct phone calls with logistics lieutenant Rehan Khan prior to the recovery while avoiding direct contact with field operatives. ^[DOC_CDR_9812345678 row:48219]",
+  "citations": [
+    {
+      "source_doc_id": "DOC_FIR_0142",
+      "locator": "p:2 l:9",
+      "snippet": "Vikram Singh s/o Ramesh, resident of Kharkhoda, named accused u/s 25 Arms Act.",
+      "observed_at": null,
+      "tier": "deterministic"
+    },
+    {
+      "source_doc_id": "DOC_CDR_9812345678",
+      "locator": "row:48219",
+      "snippet": "14 calls logged between 9812345678 and 9896011223 across 72 hours.",
+      "observed_at": null,
+      "tier": "deterministic"
+    }
+  ],
+  "notes_retrieved": [
+    "01_People/Vikram Singh.md",
+    "01_People/Rehan Khan.md",
+    "00_Raw_Inputs/FIR/FIR_0142_2026_Kharkhoda.pdf"
+  ]
+}

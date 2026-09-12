@@ -22,6 +22,7 @@ from brain.ingest import router as ingest_router
 from brain.linker import router as proposal_router
 from brain.cdr.router import router as cdr_router
 from brain.crosscase import router as crosscase_router
+from brain.vault import router as vault_router
 
 app = FastAPI(
     title="SyndicateBrain API",
@@ -42,12 +43,7 @@ app.include_router(ingest_router)
 app.include_router(proposal_router)
 app.include_router(cdr_router)
 app.include_router(crosscase_router)
-
-
-@app.get("/api/cases", response_model=list[CaseSummary])
-def get_cases():
-    """List all case folders."""
-    return mocks.get_cases()
+app.include_router(vault_router)
 
 
 @app.post("/api/case/analyse", response_model=AnalysisResult)

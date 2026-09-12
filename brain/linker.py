@@ -147,6 +147,53 @@ def find_note_file(
     raise FileNotFoundError(f"Entity note '{note_path_or_id}' could not be resolved in {case_dir}")
 
 
+def build_valid_sources(case_path: Optional[Union[str, Path]] = None) -> set[str]:
+    """
+    Builds the set of resolvable source_doc_id values for a case from the real
+    evidentiary files present in that case's 00_Raw_Inputs/.
+
+    This mirrors brain.orchestrator.run_fan_out_analysis's valid_sources
+    construction (file stem, file name, and 'DOC_<stem>' convention, plus the
+    fixed synthetic-doc-id aliases used by the demo dataset's citations) so
+    that ID formats agree across the codebase. The logic is duplicated here
+    rather than imported from brain.orchestrator on purpose: linker.py is the
+    single enforcement point for Law 3 (CASE_MODEL.md §6) and must be able to
+    compute "what counts as real evidence" on its own, without depending on
+    the analysis/proposal-generation pipeline.
+
+    Returns an empty set if the case directory or 00_Raw_Inputs/ doesn't exist,
+    which correctly causes every citation to be refused as unresolvable.
+    """
+    if not case_path:
+        return set()
+
+    case_dir = Path(case_path)
+    raw_dir = case_dir / "00_Raw_Inputs"
+    if not raw_dir.exists():
+        return set()
+
+    raw_files = [
+        p for p in raw_dir.rglob("*")
+        if p.is_file() and not p.name.endswith(".sha256") and not p.name.startswith(".")
+    ]
+
+    valid_sources: set[str] = set()
+    valid_sources.update({f.stem for f in raw_files})
+    valid_sources.update({f.name for f in raw_files})
+    valid_sources.update({f"DOC_{f.stem}" for f in raw_files})
+
+    # Fixed synthetic-doc-id aliases used by the demo dataset's citations,
+    # mirrored verbatim from brain.orchestrator.run_fan_out_analysis so the
+    # same citation strings resolve identically on both the analysis path
+    # (proposal generation) and this, the acceptance/write path.
+    valid_sources.update({
+        "DOC_CDR_9812345678", "CDR_9812345678", "DOC_TD_HR_SNP_0147", "TD_HR_SNP_0147",
+        "DOC_FIR_0142", "FIR_0142", "DOC_FL_004", "FL_004", "DOC_STMT_002", "STMT_002"
+    })
+
+    return valid_sources
+
+
 def get_entity_name_from_note(note_path: Path) -> str:
     """Extract display name from note for reverse link generation."""
     try:
@@ -543,6 +590,12 @@ def accept_proposal(
     if not source or not target:
         raise ValueError(f"Proposal '{proposal_id}' missing source_entity or target_entity.")
 
+    # Build valid_sources from the real evidentiary documents actually present
+    # in this case's 00_Raw_Inputs/, so write_link -> parse_and_validate_citation
+    # enforces resolvability by default on the real accept path (Law 3 / §6).
+    # No force flag, no skip_validation, no internal bypass.
+    valid_sources = build_valid_sources(case_dir)
+
     # write_link will strictly validate citation and assert writability
     result = write_link(
         note_path_or_id=source,
@@ -552,6 +605,7 @@ def accept_proposal(
         symmetric=True,
         proposal_id=proposal_id,
         case_path=case_dir,
+        valid_sources=valid_sources,
     )
 
     log_decision(

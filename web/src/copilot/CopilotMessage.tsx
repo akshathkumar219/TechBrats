@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import type { CopilotMessageProps } from './types'
 import { getNoteMetadata, renderContentWithCitations, isNoAnswerFound } from './utils'
 import { openFileAt } from './navigation'
@@ -55,6 +55,15 @@ export function CopilotMessage({
   })()
 
   const retrievedNotes = message.notesRetrieved || []
+  const validSourceSet = useMemo(() => {
+    const s = new Set<string>(retrievedNotes)
+    if (message.citations) {
+      for (const c of message.citations) {
+        if (c?.source_doc_id) s.add(c.source_doc_id)
+      }
+    }
+    return s
+  }, [retrievedNotes, message.citations])
 
   return (
     <div className="copilot-msg is-bot">
@@ -137,7 +146,7 @@ export function CopilotMessage({
             message.content,
             message.isStreaming,
             onCitationClick,
-            retrievedNotes
+            validSourceSet
           )}
         </div>
       )}

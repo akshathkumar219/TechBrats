@@ -7,6 +7,9 @@ interface StatusBarProps {
   noteCount?: number
   linkCount?: number
   saveStatus?: 'saved' | 'unsaved'
+  activeView?: 'editor' | 'graph'
+  nodeCount?: number
+  edgeCount?: number
 }
 
 interface IntegrityData {
@@ -22,6 +25,9 @@ export function StatusBar({
   noteCount = 42,
   linkCount = 36,
   saveStatus = 'saved',
+  activeView = 'editor',
+  nodeCount,
+  edgeCount,
 }: StatusBarProps) {
   const [integrity, setIntegrity] = useState<IntegrityData>({
     status: 'verified',
@@ -56,59 +62,96 @@ export function StatusBar({
 
   return (
     <footer className="status">
-      <div className="status-item status-case-item">
-        <span className="status-case-icon">🗂️</span>
-        <span className="status-case-title">{caseName ?? 'Case_01_Sonipat_Arms'}</span>
-      </div>
-
-      <div className="status-item status-integrity-item">
-        <span
-          className={`status-indicator ${
-            integrity.status === 'verified' ? 'status-verified' : 'status-danger'
-          }`}
-          style={{
-            backgroundColor:
-              integrity.status === 'verified' ? 'var(--ok)' : 'var(--danger)',
-          }}
-        />
-        <span>
-          {integrity.status === 'verified'
-            ? `Evidence verified · ${integrity.document_count} documents`
-            : `⚠ ${integrity.failures.length || 1} document modified since ingest`}
-        </span>
-      </div>
-
-      <div className="status-item">
-        <span>{noteCount} notes</span>
-      </div>
-
-      <div className="status-item">
-        <span>{linkCount} links</span>
-      </div>
-
-      <div style={{ flex: '1 1 auto' }} />
-
-      {filePath && (
-        <div className="status-item">
-          <span>{filePath}</span>
+      <div className="status-left">
+        <div className="status-item status-case-item">
+          <span className="status-case-icon">🗂️</span>
+          <span className="status-case-title">{caseName ?? 'Case_01_Sonipat_Arms'}</span>
         </div>
-      )}
 
-      <div className="status-item">
-        <span>{wordCount} words</span>
+        <span className="status-sep">·</span>
+
+        <div className="status-item status-integrity-item">
+          <span
+            className={`status-indicator ${
+              integrity.status === 'verified' ? 'status-verified' : 'status-danger'
+            }`}
+            style={{
+              backgroundColor:
+                integrity.status === 'verified' ? 'var(--ok)' : 'var(--danger)',
+            }}
+          />
+          <span>
+            {integrity.status === 'verified'
+              ? 'Evidence verified'
+              : `⚠ ${integrity.failures.length || 1} modified`}
+          </span>
+        </div>
+
+        <span className="status-sep">·</span>
+
+        <div className="status-item">
+          <span>{activeView === 'graph' ? `${nodeCount ?? noteCount} nodes` : `${noteCount || integrity.document_count} documents`}</span>
+        </div>
+
+        <span className="status-sep">·</span>
+
+        <div className="status-item">
+          <span>{activeView === 'graph' ? `${edgeCount ?? linkCount} links` : `${linkCount} links`}</span>
+        </div>
+
+        {activeView === 'graph' && (
+          <>
+            <span className="status-sep">·</span>
+            <div className="status-item">
+              <span style={{ color: 'var(--color-amber, #f59e0b)' }}>14 unresolved leads</span>
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="status-item">
-        <span
-          className={`status-indicator ${
-            saveStatus === 'unsaved' ? 'unsaved' : ''
-          }`}
-          style={{
-            backgroundColor:
-              saveStatus === 'unsaved' ? 'var(--accent)' : 'var(--ok)',
-          }}
-        />
-        <span>{saveStatus}</span>
+      <div className="status-right">
+        {activeView === 'graph' ? (
+          <>
+            <div className="status-item">
+              <span>Evidence Graph (Interactive)</span>
+            </div>
+            <span className="status-sep">·</span>
+            <div className="status-item">
+              <span className="status-indicator" style={{ backgroundColor: 'var(--ok)' }} />
+              <span>Cytoscape Ready</span>
+            </div>
+          </>
+        ) : (
+          <>
+            {filePath && (
+              <>
+                <div className="status-item">
+                  <span>{filePath}</span>
+                </div>
+                <span className="status-sep">·</span>
+              </>
+            )}
+
+            <div className="status-item">
+              <span>{wordCount} words</span>
+            </div>
+
+            <span className="status-sep">·</span>
+
+            <div className="status-item">
+              <span
+                className={`status-indicator ${
+                  saveStatus === 'unsaved' ? 'unsaved' : ''
+                }`}
+                style={{
+                  backgroundColor:
+                    saveStatus === 'unsaved' ? 'var(--accent)' : 'var(--ok)',
+                }}
+              />
+              <span>{saveStatus}</span>
+            </div>
+          </>
+        )}
       </div>
     </footer>
   )

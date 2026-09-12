@@ -468,19 +468,71 @@ class CDRDatabase:
 # Note Materialization (CASE_MODEL.md §4 & §6)
 # ---------------------------------------------------------------------------
 
+# Fallback used only when a case has no Case_Config.yaml (or it lacks the key) —
+# e.g. ad-hoc/test cases. Real cases are expected to set
+# resolution_thresholds.cdr_min_cluster_calls explicitly (see load_case_config()).
+# This is intentionally modest: it only clears the ">=2 calls is background noise"
+# bug (BUG #1), not the full real-data tightening — that comes from the per-case
+# config value.
+DEFAULT_MIN_CLUSTER_CALLS = 4
+
+
+def load_case_config(case_dir: Optional[Union[str, Path]]) -> dict[str, Any]:
+    """
+    Load Case_Config.yaml for a case directory, if present. Returns {} if the
+    case directory is unset, the file is missing, or it fails to parse — callers
+    must fall back to sane defaults rather than erroring, since materialization
+    must never hard-fail on a missing/incomplete config.
+    """
+    if not case_dir:
+        return {}
+    cfg_path = Path(case_dir) / "Case_Config.yaml"
+    if not cfg_path.exists():
+        return {}
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
+def get_cdr_min_cluster_calls(case_dir: Optional[Union[str, Path]] = None) -> int:
+    """
+    Read resolution_thresholds.cdr_min_cluster_calls from the case's
+    Case_Config.yaml. This is the minimum number of calls a phone pair must
+    exchange before it is "significant" enough to materialize into a
+    06_Events/ note (CASE_MODEL.md §1 caps a case at a few hundred entities;
+    a raw >=2 threshold trivially fires on ordinary background-noise pairs).
+    Falls back to DEFAULT_MIN_CLUSTER_CALLS when the config or key is absent.
+    """
+    cfg = load_case_config(case_dir)
+    thresholds = cfg.get("resolution_thresholds") or {}
+    value = thresholds.get("cdr_min_cluster_calls")
+    try:
+        return int(value) if value is not None else DEFAULT_MIN_CLUSTER_CALLS
+    except (TypeError, ValueError):
+        return DEFAULT_MIN_CLUSTER_CALLS
+
+
 def materialize_cdr_notes(
     case_dir: Union[str, Path],
     records: list[dict[str, Any]],
     doc_id: str,
     db: Optional[CDRDatabase] = None,
+    min_cluster_calls: Optional[int] = None,
 ) -> dict[str, Any]:
     """
     Materialise markdown notes in the case vault:
     - 02_Identifiers/<phone>.md for every distinct phone number with YAML frontmatter.
-    - 06_Events/ notes for significant call pairs/clusters.
+    - 06_Events/ notes for significant call pairs/clusters (gated by
+      resolution_thresholds.cdr_min_cluster_calls in Case_Config.yaml — see
+      get_cdr_min_cluster_calls()).
     - All links written exclusively through brain.linker.write_link with stable row:N locators.
     """
     cd = Path(case_dir)
+    effective_min_cluster_calls = (
+        min_cluster_calls if min_cluster_calls is not None else get_cdr_min_cluster_calls(cd)
+    )
     identifiers_dir = cd / "02_Identifiers"
     events_dir = cd / "06_Events"
 
@@ -612,9 +664,13 @@ def materialize_cdr_notes(
             key = (min(a, b), max(a, b))
             cluster_pairs[key].append(r)
 
-    # Significant cluster: pairs with >= 2 calls, or top pair if none have >= 2
+    # Significant cluster: pairs with >= cdr_min_cluster_calls (Case_Config.yaml
+    # resolution_thresholds.cdr_min_cluster_calls), or the single top pair as a
+    # last resort if nothing crosses the bar — so a case with real communication
+    # always has at least one representative event note, without every ordinary
+    # background-noise pair (a raw >=2 threshold) flooding 06_Events/.
     significant_clusters = [
-        (pair, calls) for pair, calls in cluster_pairs.items() if len(calls) >= 2
+        (pair, calls) for pair, calls in cluster_pairs.items() if len(calls) >= effective_min_cluster_calls
     ]
     if not significant_clusters and cluster_pairs:
         sorted_pairs = sorted(cluster_pairs.items(), key=lambda item: len(item[1]), reverse=True)
@@ -721,6 +777,7 @@ def load_cdr(
     profile: str = "airtel",
     doc_id: Optional[str] = None,
     db: Optional[CDRDatabase] = None,
+    min_cluster_calls: Optional[int] = None,
 ) -> dict[str, Any]:
     """
     Loads CDR CSV file:
@@ -815,7 +872,9 @@ def load_cdr(
     materialized_count = 0
     distinct_phones = database.get_distinct_phones()
     if case_dir:
-        mat_res = materialize_cdr_notes(case_dir, records, doc_id=doc_id, db=database)
+        mat_res = materialize_cdr_notes(
+            case_dir, records, doc_id=doc_id, db=database, min_cluster_calls=min_cluster_calls
+        )
         materialized_count = mat_res["materialized_notes_count"]
 
     date_range = database.get_date_range()

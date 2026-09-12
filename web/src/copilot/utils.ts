@@ -54,7 +54,13 @@ export function isNoAnswerFound(
       return true
     }
     if (content) {
-      const validation = validateText(content, message.notesRetrieved)
+      const sourcePool = new Set<string>(message.notesRetrieved || [])
+      if (message.citations) {
+        for (const c of message.citations) {
+          sourcePool.add(c.source_doc_id)
+        }
+      }
+      const validation = validateText(content, sourcePool)
       if (validation.surviving_sentences.length === 0) {
         return true
       }

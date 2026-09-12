@@ -260,6 +260,77 @@ def test_refusal_raw_inputs_guard(mock_case_dir):
         )
 
 
+def test_accept_proposal_refuses_fabricated_citation(mock_case_dir):
+    """
+    BUG #1 regression: accept_proposal() must build valid_sources from the
+    real evidentiary files in 00_Raw_Inputs/ and pass them into write_link(),
+    so a citation to a document that was never ingested is refused instead of
+    silently written. Exercises the actual accept_proposal()/write_link()
+    call path (not parse_and_validate_citation() directly with an explicit
+    valid_sources), which is the path that was previously unenforced.
+    """
+    case_dir, vikram_note, rehan_note = mock_case_dir
+
+    prop = Proposal(
+        id="exploit_fabricated_doc",
+        claim="Vikram Singh coordinated weapons delivery with Rehan Khan",
+        reason="Fabricated evidence",
+        source_entity="Vikram Singh",
+        target_entity="Rehan Khan",
+        citation=Citation(
+            source_doc_id="DOC_TOTALLY_MADE_UP_9999",
+            locator="p:3 l:11",
+        ),
+        confidence=0.99,
+        status="proposed",
+    )
+
+    vikram_before = vikram_note.read_text(encoding="utf-8")
+    rehan_before = rehan_note.read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError, match="not resolvable against case evidence"):
+        accept_proposal(proposal_id="exploit_fabricated_doc", case_path=case_dir, proposal=prop)
+
+    # Nothing was written to either note.
+    assert vikram_note.read_text(encoding="utf-8") == vikram_before
+    assert rehan_note.read_text(encoding="utf-8") == rehan_before
+
+
+def test_api_accept_proposal_refuses_fabricated_citation(mock_case_dir):
+    """
+    BUG #1 regression via the real API path: POST /api/proposal/{id}/accept
+    with a citation to a never-ingested document must return 400, not write
+    the link into the vault.
+    """
+    case_dir, vikram_note, rehan_note = mock_case_dir
+
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app)
+
+    vikram_before = vikram_note.read_text(encoding="utf-8")
+
+    payload = {
+        "case_path": str(case_dir),
+        "proposal": {
+            "id": "exploit_api_fabricated_doc",
+            "claim": "fabricated claim",
+            "reason": "fabricated reason",
+            "source_entity": "Vikram Singh",
+            "target_entity": "Rehan Khan",
+            "citation": {"source_doc_id": "DOC_TOTALLY_MADE_UP_9999", "locator": "p:3 l:11"},
+            "confidence": 0.99,
+            "status": "proposed",
+        },
+    }
+    resp = client.post("/api/proposal/exploit_api_fabricated_doc/accept", json=payload)
+    assert resp.status_code == 400
+    assert "not resolvable against case evidence" in resp.json()["detail"]
+
+    # Confirm nothing was written to the vault.
+    assert vikram_note.read_text(encoding="utf-8") == vikram_before
+
+
 def test_accept_proposal_writes_ai_marker(mock_case_dir):
     """Test accepting a proposal writes link with <!-- ai:<id> accepted --> marker and logs decision."""
     case_dir, vikram_note, rehan_note = mock_case_dir

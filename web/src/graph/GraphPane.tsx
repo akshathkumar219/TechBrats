@@ -14,6 +14,7 @@ export interface GraphPaneProps {
   onSelectEdge?: (edgeId: string) => void
   className?: string
   style?: React.CSSProperties
+  isVisible?: boolean
 }
 
 /**
@@ -38,6 +39,7 @@ export function GraphPane({
   onSelectEdge,
   className = '',
   style,
+  isVisible = true,
 }: GraphPaneProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const engineRef = useRef<CytoscapeGraphEngine | null>(null)
@@ -74,6 +76,29 @@ export function GraphPane({
       // Container kept alive across tab switches without remount jumping
     }
   }, [data, isLoading, error, caseId, leadsVisible, onSelectNode, onSelectEdge])
+
+  // Resize when visibility changes or container geometry changes
+  useEffect(() => {
+    if (isVisible && engineRef.current) {
+      const t = setTimeout(() => {
+        engineRef.current?.resize()
+      }, 50)
+      return () => clearTimeout(t)
+    }
+  }, [isVisible])
+
+  useEffect(() => {
+    if (!containerRef.current || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 20 && entry.contentRect.height > 20) {
+          engineRef.current?.resize()
+        }
+      }
+    })
+    ro.observe(containerRef.current)
+    return () => ro.disconnect()
+  }, [])
 
   // Toggle leads visibility
   const handleToggleLeads = useCallback(() => {

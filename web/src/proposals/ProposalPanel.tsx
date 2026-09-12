@@ -10,6 +10,7 @@ import { ProposalCard } from './ProposalCard'
 import { CitationChip } from './CitationChip'
 import { DEFAULT_MOCK_ANALYSIS_RESULT } from './mockData'
 import { EmptyState, LoadingSkeleton } from '../states'
+import { openFileAt } from '../workspace/navigation'
 import './proposals.css'
 
 export function ProposalPanel({
@@ -175,17 +176,7 @@ export function ProposalPanel({
   const handleOpenFile = useCallback(
     (filePath: string) => {
       onOpenFile?.(filePath)
-      window.dispatchEvent(
-        new CustomEvent('syndicate-brain:open-file', {
-          detail: { path: filePath },
-        })
-      )
-      const win = window as unknown as {
-        openFileAt?: (path: string, line?: number) => void
-      }
-      if (typeof win.openFileAt === 'function') {
-        win.openFileAt(filePath)
-      }
+      openFileAt(filePath, 1)
     },
     [onOpenFile]
   )

@@ -18,7 +18,7 @@ export function useAutosave(activeFile: VaultFile | null) {
       const { file, text } = unsavedRef.current
       unsavedRef.current = null
       try {
-        await writeFile(file.handle, text)
+        await writeFile(file, text)
         setSaveStatus('saved')
       } catch (err: unknown) {
         setSaveError(err instanceof Error ? err.message : 'Save flush failed')
@@ -36,7 +36,7 @@ export function useAutosave(activeFile: VaultFile | null) {
         unsavedRef.current = null
         timerRef.current = null
         try {
-          await writeFile(targetFile.handle, targetText)
+          await writeFile(targetFile, targetText)
           setSaveStatus('saved')
         } catch (err: unknown) {
           setSaveError(err instanceof Error ? err.message : 'Autosave failed')

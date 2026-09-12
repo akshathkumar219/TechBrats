@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react'
 import type { CitationChipProps } from './types'
+import { openFileAt } from '../workspace/navigation'
 
 export function CitationChip({
   citation,
@@ -21,25 +22,10 @@ export function CitationChip({
       e.stopPropagation()
       onClick?.(citation)
 
-      // Notify global listeners across the workbench
-      window.dispatchEvent(
-        new CustomEvent('syndicate-brain:open-citation', { detail: citation })
-      )
-
+      // Open the source note via the canonical HAR-T06 openFileAt — opens
+      // the editor pane, selects the file, scrolls to the line, highlights.
       const line = parseLocatorLine(citation.locator)
-      window.dispatchEvent(
-        new CustomEvent('syndicate-brain:open-file', {
-          detail: { path: citation.source_doc_id, line },
-        })
-      )
-
-      // Call global openFileAt if registered by HAR-T06 right-rail host
-      const win = window as unknown as {
-        openFileAt?: (path: string, line?: number) => void
-      }
-      if (typeof win.openFileAt === 'function') {
-        win.openFileAt(citation.source_doc_id, line)
-      }
+      openFileAt(citation.source_doc_id, line)
     },
     [citation, onClick]
   )

@@ -453,6 +453,20 @@ def apply_cross_case_links(
                 citation=cit,
                 symmetric=False,
                 case_path=case_dir,
+                # DOC_CASE_MATCH is a legitimate always-valid synthetic source:
+                # a cross-case hit doesn't cite a specific page/row the way an
+                # FIR or CDR does — it cites a computed, deterministic identity
+                # match between two case vaults (see scan_cross_case_hits),
+                # which is itself the "evidence" for this link. Passing it
+                # explicitly here (rather than leaving valid_sources=None)
+                # ensures parse_and_validate_citation actually enforces
+                # resolvability on this write path too, closing the same gap
+                # BUG #1 closed for accept_proposal — while still allowing the
+                # one legitimate synthetic citation this scanner ever writes.
+                # (Also accepts a caller-supplied `citation`'s own source_doc_id,
+                # in case a future caller passes a real evidentiary citation
+                # instead of the default synthetic one.)
+                valid_sources={"DOC_CASE_MATCH", cit.source_doc_id},
             )
             results.append({
                 "case": c_name,

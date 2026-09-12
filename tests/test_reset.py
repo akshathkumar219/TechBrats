@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -182,9 +183,25 @@ def test_safety_refuses_outside_target_vaults(temp_vaults_env):
     with pytest.raises(ValueError, match="protected root path"):
         validate_safety(str(REPO_ROOT), "Case_01_Sonipat_Arms")
 
-    # 4. Protected repo subdirectories
+    # 4. Protected repo subdirectories (code/docs/tests — full subtree protection)
     with pytest.raises(ValueError, match="Refusing to wipe protected repository path"):
-        validate_safety(REPO_ROOT / "data", "Case_01_Sonipat_Arms")
+        validate_safety(REPO_ROOT / "brain", "Case_01_Sonipat_Arms")
+    with pytest.raises(ValueError, match="Refusing to wipe protected repository path"):
+        validate_safety(REPO_ROOT / "tests", "some_case")
+
+    # 6. The pristine template subtree can never be wiped or targeted, however
+    #    it's addressed (as the case_path itself, or as an ancestor of it).
+    with pytest.raises(ValueError, match="Refusing to wipe protected pristine template path"):
+        validate_safety(REPO_ROOT / "data", "_pristine")
+    with pytest.raises(ValueError, match="Refusing to wipe protected pristine template path"):
+        validate_safety(REPO_ROOT / "data" / "_pristine", "Case_01_Sonipat_Arms")
+
+    # 7. BUG #3 fix: a named case folder directly under data/ IS now a valid
+    #    reset target — this is the directory the live app actually resolves
+    #    and serves (brain/orchestrator.py::resolve_case_dir), and the whole
+    #    point of `make reset` is to be able to reset it. This must NOT raise.
+    target_dir_path, case_path = validate_safety(REPO_ROOT / "data", "Case_01_Sonipat_Arms")
+    assert case_path == (REPO_ROOT / "data" / "Case_01_Sonipat_Arms").resolve()
 
 
 def test_reset_idempotent(temp_vaults_env):
@@ -223,6 +240,62 @@ def test_reset_dry_run(temp_vaults_env):
     assert report["dry_run"] is True
     # Case directory should NOT have been created
     assert not target_case.exists()
+
+
+def test_reset_case_refuses_source_target_collision(tmp_path):
+    """
+    BUG #3 regression: source_dir and target_dir resolving to the same case
+    directory must be refused, not silently wipe the donor before copying
+    from it. This is what would happen if someone reintroduced
+    source_dir=target_dir="data" defaults.
+    """
+    same_root = tmp_path / "same_root"
+    same_root.mkdir()
+    (same_root / "Case_01_Sonipat_Arms").mkdir()
+
+    with pytest.raises(ValueError, match="source_case_path and target_case_path are identical"):
+        reset_case(
+            case_name="Case_01_Sonipat_Arms",
+            target_dir=same_root,
+            source_dir=same_root,
+        )
+
+
+def test_reset_pristine_template_architecture(tmp_path):
+    """
+    BUG #3 regression: verifies the actual intended architecture — a pristine
+    template directory (mirroring data/_pristine/) is copied INTO a live case
+    directory (mirroring data/), which is what the app's resolve_case_dir()
+    (brain/orchestrator.py, brain/integrity.py) actually resolves and serves.
+    Uses an isolated tmp_path standing in for the repo's data/ and
+    data/_pristine/ so this test never touches the real demo case.
+    """
+    fake_data = tmp_path / "data"
+    fake_pristine = fake_data / "_pristine"
+    fake_data.mkdir()
+    fake_pristine.mkdir()
+
+    # Seed the pristine template with a real case copied from the repo's
+    # actual pristine dataset (read-only; never modified by this test).
+    shutil.copytree(REPO_ROOT / "data" / "Case_01_Sonipat_Arms", fake_pristine / "Case_01_Sonipat_Arms")
+
+    result = reset_case(
+        case_name="Case_01_Sonipat_Arms",
+        target_dir=fake_data,
+        source_dir=fake_pristine,
+        cached=False,
+    )
+
+    assert result["status"] == "success"
+    live_case = fake_data / "Case_01_Sonipat_Arms"
+    assert live_case.is_dir()
+    assert live_case != fake_pristine / "Case_01_Sonipat_Arms"
+    assert (live_case / "Case_Config.yaml").is_file()
+    # The pristine donor itself must remain untouched by the reset.
+    assert (fake_pristine / "Case_01_Sonipat_Arms" / "Case_Config.yaml").is_file()
+
+    unlock_path_recursive(fake_data)
+    unlock_path_recursive(fake_pristine)
 
 
 def test_cli_execution(temp_vaults_env):

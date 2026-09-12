@@ -141,68 +141,10 @@
 }
 
 .copilot-empty-title {
-  font-size: var(--fs-md);
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: var(--s1);
-}
-
-.copilot-empty-desc {
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-  max-width: 34ch;
-  line-height: 1.5;
-  margin-bottom: var(--s5);
-}
-
-.copilot-suggestions-header {
-  font-size: var(--fs-xs);
-  color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: var(--s2);
-  align-self: flex-start;
-  width: 100%;
-  text-align: left;
-}
-
-.copilot-suggestions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
-  width: 100%;
-}
-
-.copilot-suggestion-btn {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: var(--s2) var(--s3);
-  background-color: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  color: var(--text-body);
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
-}
-
-.copilot-suggestion-btn:hover {
-  background-color: var(--bg-overlay);
-  border-color: var(--border-strong);
-  color: var(--text-primary);
-}
-
-.copilot-suggestion-arrow {
-  color: var(--text-faint);
-  font-size: var(--fs-xs);
-}
-
-.copilot-suggestion-btn:hover .copilot-suggestion-arrow {
-  color: var(--accent);
+  margin-bottom: 0;
 }
 
 /* ---- Message Items ---- */
@@ -720,17 +662,21 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
   padding: 0 var(--s1);
+  box-sizing: border-box;
 }
 
-.copilot-hint {
+.copilot-hint-left {
   font-size: var(--fs-xs);
   color: var(--text-faint);
   user-select: none;
 }
 
-.copilot-law-badge {
+.copilot-hint-right {
   font-size: var(--fs-xs);
-  font-family: var(--font-mono);
   color: var(--text-faint);
+  user-select: none;
+  text-align: right;
+  margin-left: auto;
 }

@@ -11,7 +11,7 @@ import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { editorTheme, syntaxTheme } from './theme'
 import { wikiLinkCompletion } from './wikiLink'
 import { formattingKeymap } from './formatting'
-import { livePreview } from './livePreview'
+import { livePreview, livePreviewClickHandler } from './livePreview'
 import type { VaultFile } from '../fs/vault'
 
 interface Options {
@@ -89,6 +89,7 @@ export function buildExtensions({ getFiles, placeholder }: Options): Extension[]
     editorTheme,
     syntaxTheme,
     livePreview,
+    livePreviewClickHandler,
     ...(placeholder ? [cmPlaceholder(placeholder)] : []),
   ]
 }

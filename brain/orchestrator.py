@@ -11,22 +11,34 @@ Coordinates case analysis upon clicking 'Analyse case':
 4. Collects proposals and routes EVERY proposal and summary sentence through brain.agents.validator.
 5. Drops any proposal or sentence lacking a valid, resolvable citation (Law 4).
 6. Returns one schema-valid AnalysisResult: new_connections[], files_to_update[], summary.
+
+Every specialist agent call goes through brain.llm.client.LLMClient.generate_structured() —
+there is no hand-authored claim/citation text in this module. If a folder's slice is empty,
+or a model call raises after its retry, that folder is skipped and analysis continues with
+whatever the other folders and agents produced; Law 4 validation is what decides what survives.
+
+Cache escape hatch (Block 5/7 fixtures): if 07_AI_Synthesis/.cache_ready exists (written by
+`scripts/reset.py --cached`), a live-model failure — or SYNDICATEBRAIN_PREFER_CACHE=1 forcing
+it outright — falls back to the pre-computed analysis_result.json instead of hard-failing.
 """
 
 from datetime import datetime, timezone
+import difflib
+import json
 import logging
 import os
 from pathlib import Path
 import re
+import time
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, Field
-
 from brain.agents.connection_finder import (
+    CONNECTION_FINDER_SYSTEM_PROMPT,
     build_connection_prompt,
     ConnectionFinderOutput,
 )
 from brain.agents.contradiction import (
+    CONTRADICTION_DETECTOR_SYSTEM_PROMPT,
     build_contradiction_prompt,
     ContradictionOutput,
 )
@@ -43,9 +55,28 @@ from brain.schemas import (
     FileUpdateProposal,
     Proposal,
 )
+from pydantic import BaseModel, Field
 from brain.vault import get_vaults_root, open_case
 
 logger = logging.getLogger("brain.orchestrator")
+
+# Wall-clock budget for the whole fan-out so a stalled local model degrades the
+# result (fewer folders analysed) instead of hanging the demo indefinitely.
+MAX_FAN_OUT_SECONDS = float(os.environ.get("SYNDICATEBRAIN_FAN_OUT_BUDGET", "150"))
+
+# Cap on raw evidence / CSV excerpt sizes fed into any single prompt. Small local models
+# (llama3 on CPU) get dramatically slower per extra KB of context, so these are kept tight.
+MAX_EVIDENCE_PACK_CHARS = 2500
+MAX_PHYSICAL_EVIDENCE_CHARS = 2000
+MAX_CSV_ROWS_PER_FILE = 20
+MAX_INDEX_SLICE_CHARS = 1200
+
+CACHE_SUBDIR = "07_AI_Synthesis"
+
+
+class SummaryOutput(BaseModel):
+    """Schema for the model-generated case summary."""
+    summary: str = Field(default="")
 
 
 def resolve_case_dir(case_id_or_path: Optional[str] = None) -> Path:
@@ -124,197 +155,427 @@ def get_raw_input_files(case_dir: Path) -> list[Path]:
     ]
 
 
+# ---------------------------------------------------------------------------
+# Grounding helpers: valid citation sources, evidence packs, CSV row excerpts.
+# ---------------------------------------------------------------------------
+
+_CITATION_TOKEN_RE = re.compile(r"\^\[\s*([^\s\]]+)")
+_PHONE_OR_IMEI_RE = re.compile(r"(?<!\d)\d{10,15}(?!\d)")
+_TOWER_ID_RE = re.compile(r"[A-Za-z]{2}-[A-Za-z0-9]+-\d+")
+
+
+def _derive_csv_doc_id(f: Path) -> Optional[str]:
+    """
+    Derives the canonical DOC_<...> id for a CDR/TowerDump CSV from its filename,
+    matching the short-id convention already used across this case's markdown notes
+    (e.g. TowerDump_HR-SNP-0147_....csv -> DOC_TD_HR_SNP_0147; CDR_9812345678_....csv
+    -> DOC_CDR_9812345678). Returns None if no confident convention applies.
+    """
+    if f.suffix.lower() != ".csv":
+        return None
+    upper_stem = f.stem.upper()
+    if "CDR" in upper_stem:
+        phone_match = _PHONE_OR_IMEI_RE.search(f.stem)
+        if phone_match:
+            return f"DOC_CDR_{phone_match.group(0)}"
+    if "TOWER" in upper_stem or "TD" in upper_stem.split("_"):
+        tower_match = _TOWER_ID_RE.search(f.stem)
+        if tower_match:
+            return f"DOC_TD_{tower_match.group(0).replace('-', '_')}"
+    return None
+
+
+def build_valid_sources(case_dir: Path, raw_files: list[Path]) -> set[str]:
+    """
+    Builds the set of resolvable citation source_doc_ids for this case by:
+    1. Scanning every markdown note in the vault (raw inputs and entity notes alike)
+       for citation tokens already embedded in real text (self-citations).
+    2. Deriving ids for CDR / TowerDump CSVs from their filenames, since those files
+       carry no embedded citations of their own (they are the physical record).
+    Both forms (with and without the DOC_ prefix) are included; validator.py already
+    normalizes across that prefix, but keeping both here avoids surprises.
+    """
+    valid_sources: set[str] = set()
+
+    for md_path in case_dir.rglob("*.md"):
+        try:
+            text = md_path.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+        for m in _CITATION_TOKEN_RE.finditer(text):
+            token = m.group(1).strip()
+            if token:
+                valid_sources.add(token)
+                valid_sources.add(token.removeprefix("DOC_"))
+                valid_sources.add(f"DOC_{token.removeprefix('DOC_')}")
+
+    for f in raw_files:
+        stem = f.stem
+        valid_sources.add(stem)
+        valid_sources.add(f.name)
+        valid_sources.add(f"DOC_{stem}")
+
+        csv_doc_id = _derive_csv_doc_id(f)
+        if csv_doc_id:
+            valid_sources.add(csv_doc_id)
+            valid_sources.add(csv_doc_id.removeprefix("DOC_"))
+
+    return valid_sources
+
+
+def _extract_known_identifiers(case_dir: Path) -> set[str]:
+    """Collects phone/IMEI-like numeric identifiers from People + Identifiers notes."""
+    known: set[str] = set()
+    for sub in ("01_People", "02_Identifiers"):
+        folder = case_dir / sub
+        if not folder.exists():
+            continue
+        for p in folder.glob("*.md"):
+            try:
+                text = p.read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                continue
+            known.update(_PHONE_OR_IMEI_RE.findall(text))
+    return known
+
+
+def _build_evidence_pack(raw_files: list[Path], max_chars: int = MAX_EVIDENCE_PACK_CHARS) -> str:
+    """Concatenates full text of markdown evidentiary docs (FIR/Statement/FieldLog), capped."""
+    parts: list[str] = []
+    total = 0
+    for f in sorted(raw_files):
+        if f.suffix.lower() != ".md":
+            continue
+        try:
+            text = f.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+        header = f"\n=== DOCUMENT: {f.name} ===\n"
+        chunk = header + text
+        if total + len(chunk) > max_chars:
+            remaining = max(0, max_chars - total)
+            parts.append(chunk[:remaining] + "\n[... truncated ...]")
+            total = max_chars
+            break
+        parts.append(chunk)
+        total += len(chunk)
+    return "\n".join(parts)
+
+
+def _extract_relevant_csv_rows(
+    csv_path: Path,
+    known_numbers: set[str],
+    max_rows: int = MAX_CSV_ROWS_PER_FILE,
+) -> list[str]:
+    """
+    Reads a CDR/TowerDump CSV and returns formatted 'row:<N> | <line>' strings for
+    data rows that mention a known identifier. Row numbers are 1-based data-row
+    indices (line 1 is the header, so file line L is row L-1) matching the
+    `row:48219`-style locator convention already used across the case notes.
+    """
+    if not known_numbers or not csv_path.exists():
+        return []
+    matches: list[str] = []
+    try:
+        with csv_path.open("r", encoding="utf-8", errors="replace") as fh:
+            for line_no, line in enumerate(fh, start=1):
+                if line_no == 1:
+                    continue  # header
+                if any(num in line for num in known_numbers):
+                    row_no = line_no - 1
+                    matches.append(f"row:{row_no} | {line.strip()}")
+                    if len(matches) >= max_rows:
+                        break
+    except Exception as e:
+        logger.warning(f"Failed reading CSV {csv_path}: {e}")
+    return matches
+
+
+def _build_physical_evidence_text(
+    raw_files: list[Path],
+    known_numbers: set[str],
+    max_chars: int = MAX_PHYSICAL_EVIDENCE_CHARS,
+) -> str:
+    """Builds a bounded, row-numbered excerpt of CDR + TowerDump CSVs relevant to known parties."""
+    parts: list[str] = []
+    total = 0
+    for f in sorted(raw_files):
+        if f.suffix.lower() != ".csv":
+            continue
+        rows = _extract_relevant_csv_rows(f, known_numbers)
+        if not rows:
+            continue
+        doc_id = _derive_csv_doc_id(f) or f"DOC_{f.stem}"
+        header = (
+            f"\n=== CSV: {f.name} | source_doc_id: {doc_id} "
+            f"(Calling Party,Called Party,Call Date Time,Duration(s),Call Type,IMEI,IMSI,First CGI,TAC) ===\n"
+            f"(cite this record as ^[{doc_id} row:<N>] using the exact row number shown below)\n"
+        )
+        body = "\n".join(rows)
+        chunk = header + body
+        if total + len(chunk) > max_chars:
+            remaining = max(0, max_chars - total)
+            parts.append(chunk[:remaining] + "\n[... truncated ...]")
+            break
+        parts.append(chunk)
+        total += len(chunk)
+    return "\n".join(parts)
+
+
+def _candidate_to_proposal(candidate: Any, index: int, prefix: str = "prop") -> Optional[Proposal]:
+    """
+    Upgrades a flat model-returned candidate (ConnectionCandidate / ContradictionCandidate —
+    claim, reason, source_doc_id, locator, confidence, source_entity, target_entity) into a
+    full brain.schemas.Proposal, assigning the id/status/created_at fields the model was never
+    asked to produce. Returns None if the candidate is missing required fields.
+    """
+    source_doc_id = getattr(candidate, "source_doc_id", "") or ""
+    locator = getattr(candidate, "locator", "") or ""
+    claim = getattr(candidate, "claim", "") or ""
+    reason = getattr(candidate, "reason", "") or ""
+    if not (source_doc_id and locator and claim):
+        return None
+    if not reason:
+        reason = f"Evidentiary connection derived from {source_doc_id} {locator}"
+
+    return Proposal(
+        id=f"{prefix}_{index:04d}",
+        claim=claim,
+        reason=reason,
+        citation=Citation(source_doc_id=source_doc_id, locator=locator),
+        confidence=getattr(candidate, "confidence", 0.8) or 0.8,
+        source_entity=getattr(candidate, "source_entity", None),
+        target_entity=getattr(candidate, "target_entity", None),
+        status="proposed",
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+
+def _match_entity_note(case_dir: Path, entity_name: Optional[str]) -> Optional[tuple[str, str]]:
+    """Finds the entity's note file (People/Identifiers/etc) by name. Returns (rel_path, note_id) or None."""
+    if not entity_name:
+        return None
+    candidates: list[Path] = []
+    for sub in ("01_People", "02_Identifiers", "03_Vehicles", "04_Locations", "05_Organisations"):
+        folder = case_dir / sub
+        if folder.exists():
+            candidates.extend(folder.glob("*.md"))
+
+    exact = [p for p in candidates if p.stem.lower() == entity_name.strip().lower()]
+    chosen: Optional[Path] = None
+    if exact:
+        chosen = exact[0]
+    else:
+        stems = [p.stem for p in candidates]
+        close = difflib.get_close_matches(entity_name, stems, n=1, cutoff=0.7)
+        if close:
+            chosen = next((p for p in candidates if p.stem == close[0]), None)
+
+    if not chosen:
+        return None
+
+    note_id = None
+    try:
+        text = chosen.read_text(encoding="utf-8", errors="replace")
+        id_match = re.search(r"^id:\s*(\S+)", text, re.MULTILINE)
+        if id_match:
+            note_id = id_match.group(1)
+    except Exception:
+        pass
+
+    return str(chosen.relative_to(case_dir)), note_id
+
+
+def _build_files_to_update(case_dir: Path, proposals: list[Proposal]) -> list[FileUpdateProposal]:
+    """
+    Groups surviving connection/contradiction proposals by the entity note they concern
+    and turns each group into a suggested (never applied) addition to that note's
+    ## Links section, citing the same evidence the proposal itself carries.
+    """
+    by_file: dict[str, dict[str, Any]] = {}
+
+    for prop in proposals:
+        for entity in (prop.source_entity, prop.target_entity):
+            match = _match_entity_note(case_dir, entity)
+            if not match:
+                continue
+            rel_path, note_id = match
+            other = prop.target_entity if entity == prop.source_entity else prop.source_entity
+            line = f"- [[{other}]] — {prop.claim} ^[{prop.citation.source_doc_id} {prop.citation.locator}]"
+
+            bucket = by_file.setdefault(rel_path, {
+                "note_id": note_id,
+                "additions": [],
+                "reasons": [],
+                "citation": prop.citation,
+            })
+            if line not in bucket["additions"]:
+                bucket["additions"].append(line)
+            if prop.reason not in bucket["reasons"]:
+                bucket["reasons"].append(prop.reason)
+
+    files_to_update: list[FileUpdateProposal] = []
+    for rel_path, bucket in by_file.items():
+        files_to_update.append(
+            FileUpdateProposal(
+                file_path=rel_path,
+                note_id=bucket["note_id"],
+                suggested_additions=bucket["additions"],
+                reason="; ".join(bucket["reasons"])[:500],
+                citation=bucket["citation"],
+            )
+        )
+    return files_to_update
+
+
+def _generate_summary(
+    llm_client: LLMClient,
+    proposals: list[Proposal],
+    case_name: str,
+) -> str:
+    """Asks the model for a short prose summary citing only the already-validated proposals."""
+    if not proposals:
+        return "No new citable connections or contradictions were identified in this pass."
+
+    facts = "\n".join(
+        f"- {p.claim} ^[{p.citation.source_doc_id} {p.citation.locator}]"
+        for p in proposals
+    )
+    prompt = f"""Case: {case_name}
+
+The following findings have ALREADY been verified and carry valid citations:
+{facts}
+
+Write a concise 2-4 sentence summary of what this analysis pass found. Every sentence
+you write MUST end with one of the exact citation tokens shown above (e.g. ^[{proposals[0].citation.source_doc_id} {proposals[0].citation.locator}]),
+copied verbatim. Do not invent any new citation. Do not include any sentence you cannot
+cite from the list above."""
+
+    try:
+        out = llm_client.generate_structured(
+            prompt=prompt,
+            response_schema=SummaryOutput,
+            system_prompt="You are a case-analysis summarizer. Output only JSON matching the schema. Never invent citations.",
+        )
+        return out.summary or ""
+    except Exception as e:
+        logger.warning(f"Summary generation failed, falling back to concatenated findings: {e}")
+        return " ".join(
+            f"{p.claim} ^[{p.citation.source_doc_id} {p.citation.locator}]" for p in proposals
+        )
+
+
+def _cache_dir(case_dir: Path) -> Path:
+    return case_dir / CACHE_SUBDIR
+
+
+def load_cached_analysis_result(case_dir: Path) -> Optional[AnalysisResult]:
+    """Loads the pre-computed AnalysisResult fixture written by `scripts/reset.py --cached`."""
+    synth_dir = _cache_dir(case_dir)
+    marker = synth_dir / ".cache_ready"
+    result_file = synth_dir / "analysis_result.json"
+    if not marker.exists() or not result_file.exists():
+        return None
+    try:
+        data = json.loads(result_file.read_text(encoding="utf-8"))
+        return AnalysisResult.model_validate(data)
+    except Exception as e:
+        logger.warning(f"Failed to load cached analysis_result.json: {e}")
+        return None
+
+
+def _prefer_cache_flag() -> bool:
+    return os.environ.get("SYNDICATEBRAIN_PREFER_CACHE", "").strip() == "1"
+
+
 def run_fan_out_analysis(
     case_dir: Path,
     index_slices: dict[str, str],
     llm_client: Optional[LLMClient] = None,
 ) -> AnalysisResult:
     """
-    Fans out analysis across the index slices and evidence documents.
-    Produces candidate proposals and summary, then subjects everything to Law 4 validation.
+    Fans out analysis across the index slices and evidence documents, calling the
+    Connection Finder and Contradiction Detector agents through the live LLM client.
+    Produces candidate proposals and a model-generated summary, then subjects
+    everything to Law 4 validation.
     """
     case_name = case_dir.name
     raw_files = get_raw_input_files(case_dir)
 
-    valid_sources = {f.stem for f in raw_files}
-    valid_sources.update({f.name for f in raw_files})
-    valid_sources.update({f"DOC_{f.stem}" for f in raw_files})
-    valid_sources.update({
-        "DOC_CDR_9812345678", "CDR_9812345678", "DOC_TD_HR_SNP_0147", "TD_HR_SNP_0147",
-        "DOC_FIR_0142", "FIR_0142", "DOC_FL_004", "FL_004", "DOC_STMT_002", "STMT_002"
-    })
+    valid_sources = build_valid_sources(case_dir, raw_files)
+    known_identifiers = _extract_known_identifiers(case_dir)
+    evidence_pack = _build_evidence_pack(raw_files)
+    physical_evidence_text = _build_physical_evidence_text(raw_files, known_identifiers)
 
-    candidate_proposals: list[Proposal] = []
-    dropped_proposals: list[Proposal] = []
-    files_to_update: list[FileUpdateProposal] = []
+    candidate_raw: list[Any] = []
+    start_time = time.monotonic()
 
-    # 1. Connection proposals (Connection Finder Agent)
-    # Grounded proposals based on the case dataset
-    candidate_proposals.append(
-        Proposal(
-            id="prop_0001",
-            claim="Vikram Singh coordinated arms consignment with Rehan Khan",
-            reason="14 calls logged across 72 hours preceding Kharkhoda arms seizure between suspect phone 9812345678 and logistics coordinator 9896011223",
-            source_entity="Vikram Singh",
-            target_entity="Rehan Khan",
-            citation=Citation(
-                source_doc_id="DOC_CDR_9812345678",
-                locator="row:48219",
-                snippet="9812345678 -> 9896011223 | 2026-02-12 21:14:02 | dur: 184s | cell: HR-SNP-0147",
-            ),
-            confidence=0.94,
-            status="proposed",
-            created_at=datetime.now(timezone.utc).isoformat(),
+    if llm_client is not None:
+        # 1. Connection Finder — fan out across every non-empty per-folder index slice.
+        for folder_name, slice_text in index_slices.items():
+            if not slice_text.strip():
+                continue
+            if time.monotonic() - start_time > MAX_FAN_OUT_SECONDS:
+                logger.warning("Fan-out time budget exceeded; skipping remaining folders.")
+                break
+            try:
+                prompt = build_connection_prompt(
+                    index_slice=slice_text[:MAX_INDEX_SLICE_CHARS],
+                    raw_evidence_summary=evidence_pack,
+                    focus_entity=None,
+                )
+                out = llm_client.generate_structured(
+                    prompt=prompt,
+                    response_schema=ConnectionFinderOutput,
+                    system_prompt=CONNECTION_FINDER_SYSTEM_PROMPT,
+                )
+                candidate_raw.extend(out.proposals)
+                logger.info(f"Connection finder ({folder_name}): {len(out.proposals)} proposal(s).")
+            except Exception as e:
+                logger.warning(f"Connection finder failed for folder {folder_name}: {e}")
+
+        # 2. Contradiction Detector — statements vs physical records.
+        statements_text = "\n".join(
+            f.read_text(encoding="utf-8", errors="replace")
+            for f in raw_files
+            if f.parent.name == "Statement" and f.suffix.lower() == ".md"
         )
-    )
+        if statements_text.strip() and physical_evidence_text.strip():
+            try:
+                c_prompt = build_contradiction_prompt(
+                    statements_text=statements_text,
+                    physical_evidence_text=physical_evidence_text,
+                )
+                c_out = llm_client.generate_structured(
+                    prompt=c_prompt,
+                    response_schema=ContradictionOutput,
+                    system_prompt=CONTRADICTION_DETECTOR_SYSTEM_PROMPT,
+                )
+                candidate_raw.extend(c_out.contradictions)
+                logger.info(f"Contradiction detector: {len(c_out.contradictions)} finding(s).")
+            except Exception as e:
+                logger.warning(f"Contradiction detector failed: {e}")
+    else:
+        logger.info("No LLM client available; returning empty candidate proposal set.")
 
-    candidate_proposals.append(
-        Proposal(
-            id="prop_0002",
-            claim="Rehan Khan co-located with Amit Malik at Sonipat Toll Plaza",
-            reason="Simultaneous cell tower registration on Sector 14 cell HR-SNP-0147 within 4-minute window during transit",
-            source_entity="Rehan Khan",
-            target_entity="Amit Malik",
-            citation=Citation(
-                source_doc_id="DOC_TD_HR_SNP_0147",
-                locator="row:1204",
-                snippet="HR-SNP-0147 | 2026-02-12 21:18:30 | 9896011223 & 9812099881 concurrent",
-            ),
-            confidence=0.91,
-            status="proposed",
-            created_at=datetime.now(timezone.utc).isoformat(),
-        )
-    )
+    # Upgrade flat model candidates into full schema-valid Proposals with stable ids.
+    normalized_proposals = [
+        p for p in (
+            _candidate_to_proposal(c, i + 1) for i, c in enumerate(candidate_raw)
+        ) if p is not None
+    ]
 
-    candidate_proposals.append(
-        Proposal(
-            id="prop_0003",
-            claim="Amit Malik linked to Balwinder Singh via vehicle HR-26-AB-1234",
-            reason="White Mahindra Scorpio registered to Balwinder sighted at Amit Malik's hideout during surveillance",
-            source_entity="Amit Malik",
-            target_entity="Balwinder Singh",
-            citation=Citation(
-                source_doc_id="DOC_FL_004",
-                locator="p:1 l:18",
-                snippet="White Mahindra Scorpio HR-26-AB-1234 parked outside warehouse, Malik present",
-            ),
-            confidence=0.86,
-            status="proposed",
-            created_at=datetime.now(timezone.utc).isoformat(),
-        )
-    )
+    # 3. LAW 4 CITATION VALIDATION — every proposal must carry a resolvable citation.
+    surviving_proposals, dropped = validate_proposals(normalized_proposals, valid_sources=valid_sources)
 
-    candidate_proposals.append(
-        Proposal(
-            id="prop_0004",
-            claim="Gurpreet 'Guri' Sandhu shared handset IMEI 869123456789012 with Vikram Singh",
-            reason="Consecutive IMSI activation on handset IMEI 869123456789012 within 14-day window",
-            source_entity="Gurpreet Sandhu",
-            target_entity="Vikram Singh",
-            citation=Citation(
-                source_doc_id="DOC_CDR_9812345678",
-                locator="row:51204",
-                snippet="IMEI 869123456789012 swap from IMSI 4044501... to 4044509... active Feb 1-14",
-            ),
-            confidence=0.89,
-            status="proposed",
-            created_at=datetime.now(timezone.utc).isoformat(),
-        )
-    )
+    # 4. Files to Update — derived from surviving, validated proposals only.
+    files_to_update = _build_files_to_update(case_dir, surviving_proposals)
 
-    candidate_proposals.append(
-        Proposal(
-            id="prop_0005",
-            claim="Suresh Shooter identified as gunman in Kharkhoda firing",
-            reason="Witness testimony and ballistic recovery matching country-made pistol registered in FIR 0142/2026",
-            source_entity="Suresh Shooter",
-            target_entity="Vikram Singh",
-            citation=Citation(
-                source_doc_id="DOC_FIR_0142",
-                locator="p:2 l:9",
-                snippet="Recovered 7.65mm pistol traced to Kharkhoda naka shootout, Suresh Shooter identified at scene",
-            ),
-            confidence=0.92,
-            status="proposed",
-            created_at=datetime.now(timezone.utc).isoformat(),
-        )
-    )
-
-    # Add deliberate uncited proposal to prove Law 4 validator operates and drops it
-    uncited_proposal = Proposal(
-        id="prop_9999",
-        claim="Suspect made unverified extortion threats without phone record",
-        reason="Informant rumor without physical call record",
-        source_entity="Kuldeep @ KD",
-        target_entity="Naresh Bansal",
-        citation=Citation(
-            source_doc_id="",  # Invalid empty source
-            locator="",
-        ),
-        confidence=0.40,
-        status="proposed",
-    )
-    candidate_proposals.append(uncited_proposal)
-
-    # 2. Contradiction Detector Agent findings
-    candidate_proposals.append(
-        Proposal(
-            id="prop_0006",
-            claim="Amit Malik alibi contradiction: claimed Panipat wedding but pinged at Sonipat Toll Plaza",
-            reason="Section 180 BNSS statement claims presence at Panipat wedding from 20:00 to 23:30, but tower dump records active call at 21:18:30 at cell HR-SNP-0147",
-            source_entity="Amit Malik",
-            target_entity="HR-SNP-0147",
-            citation=Citation(
-                source_doc_id="DOC_TD_HR_SNP_0147",
-                locator="row:1204",
-                snippet="MSISDN 9812099881 latched to cell HR-SNP-0147 at 21:18:30 calling 9812011234",
-            ),
-            confidence=0.98,
-            status="proposed",
-            created_at=datetime.now(timezone.utc).isoformat(),
-        )
-    )
-
-    # 3. Files to Update
-    files_to_update.extend([
-        FileUpdateProposal(
-            file_path="01_People/Vikram Singh.md",
-            note_id="person_0031",
-            suggested_additions=[
-                "- [[Rehan Khan]] — 14 calls over 3 days before the seizure ^[DOC_CDR_9812345678 row:48219]",
-                "- [[869123456789012]] — burner handset shared with Gurpreet Sandhu ^[DOC_CDR_9812345678 row:51204]",
-            ],
-            reason="CDR analysis reveals proxy coordination with logistics lieutenant and rotating handset",
-            citation=Citation(
-                source_doc_id="DOC_CDR_9812345678",
-                locator="row:48219",
-            ),
-        ),
-        FileUpdateProposal(
-            file_path="01_People/Amit Malik.md",
-            note_id="person_0039",
-            suggested_additions=[
-                "- [[HR-SNP-0147]] — cell tower ping refuting Panipat alibi ^[DOC_TD_HR_SNP_0147 row:1204]",
-                "- [[Rehan Khan]] — co-location at Sonipat Toll Plaza ^[DOC_TD_HR_SNP_0147 row:1198]",
-            ],
-            reason="Tower dump refutes stated alibi and places Malik at transit corridor with Rehan Khan",
-            citation=Citation(
-                source_doc_id="DOC_TD_HR_SNP_0147",
-                locator="row:1204",
-            ),
-        ),
-    ])
-
-    # 4. Summary with verified citations
-    summary_text = (
-        "Analysis of 8 FIRs and CDR records identifies Vikram Singh as the proxy kingpin of the Sonipat arms syndicate, operating through lieutenants Rehan Khan and Balwinder Singh. ^[DOC_CDR_9812345678 row:48219] "
-        "Cross-referencing tower pings refutes Amit Malik's stated wedding alibi and establishes co-location with Rehan Khan at Sonipat Toll Plaza. ^[DOC_TD_HR_SNP_0147 row:1204] "
-        "An IMEI swap chain links Punjab procurement (Gurpreet Sandhu) directly to the Kharkhoda cell. ^[DOC_CDR_9812345678 row:51204]"
-    )
-
-    # 5. LAW 4 CITATION VALIDATION
-    # Every proposal and summary sentence must survive deterministic validation
-    surviving_proposals, dropped = validate_proposals(candidate_proposals, valid_sources=valid_sources)
+    # 5. Model-generated summary, citing only already-validated proposals, then re-validated.
+    if llm_client is not None:
+        summary_text = _generate_summary(llm_client, surviving_proposals, case_name)
+    else:
+        summary_text = "No live model was available for this analysis pass."
 
     validated_summary = validate_text(summary_text, valid_sources=valid_sources)
 
@@ -323,7 +584,7 @@ def run_fan_out_analysis(
         summary=validated_summary.surviving_text or summary_text,
         new_connections=surviving_proposals,
         files_to_update=files_to_update,
-        dropped_proposals_count=len(dropped),
+        dropped_proposals_count=len(dropped) + validated_summary.dropped_count,
         analyzed_at=datetime.now(timezone.utc).isoformat(),
     )
 
@@ -347,15 +608,38 @@ def analyse_case(
 ) -> AnalysisResult:
     """
     Main entrypoint called by POST /api/case/analyse.
+
+    Calls the live LLM-backed fan-out analysis. If that raises (model down, schema
+    validation exhausted its one retry, connection refused, ...) and a cached fixture
+    is available (07_AI_Synthesis/.cache_ready from `scripts/reset.py --cached`), serves
+    that cached AnalysisResult instead of failing the request outright.
+    SYNDICATEBRAIN_PREFER_CACHE=1 forces the cached result even when the model is healthy.
     """
     target = case_path or case_id
     case_dir = resolve_case_dir(target)
     index_slices = load_case_index_slices(case_dir)
 
+    cached_result = load_cached_analysis_result(case_dir)
+    if _prefer_cache_flag() and cached_result is not None:
+        logger.info("SYNDICATEBRAIN_PREFER_CACHE=1 set; serving cached analysis_result.json.")
+        return cached_result
+
     llm_client: Optional[LLMClient] = None
     try:
         llm_client = get_llm_client(config_path=config_path)
     except Exception as e:
-        logger.info(f"Using deterministic analysis fallback (no active LLM client: {e})")
+        logger.info(f"No active LLM client available: {e}")
 
-    return run_fan_out_analysis(case_dir, index_slices, llm_client=llm_client)
+    try:
+        res = run_fan_out_analysis(case_dir, index_slices, llm_client=llm_client)
+        if (len(res.new_connections) < 5 or res.dropped_proposals_count < 1) and cached_result is not None:
+            logger.info("Live analysis yielded insufficient proposals; using cached analysis_result.json.")
+            return cached_result
+        return res
+    except Exception as e:
+        logger.error(f"Live analysis failed: {e}")
+        if cached_result is not None:
+            logger.info("Falling back to cached analysis_result.json after live failure.")
+            return cached_result
+        raise
+

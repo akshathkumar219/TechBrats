@@ -348,6 +348,75 @@ def list_cases(vaults_root: Union[Path, str]) -> list[dict[str, Any]]:
 
 
 # FastAPI Router definition
+from fastapi import APIRouter, Body, HTTPException, Query
+from pydantic import BaseModel, ConfigDict
+
+
+class NoteWriteRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    path: str
+    content: str
+    case_id: Optional[str] = None
+
+
+class NoteCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    path: str
+    content: Optional[str] = ""
+    case_id: Optional[str] = None
+
+
+def resolve_case_file(
+    rel_or_abs_path: Union[str, Path],
+    case_id: Optional[str] = None,
+) -> tuple[Path, Path]:
+    """
+    Resolves a case file path.
+    Returns (case_dir, absolute_file_path).
+    """
+    raw_p = Path(rel_or_abs_path)
+
+    clean_cid: Optional[str] = str(case_id) if (case_id and isinstance(case_id, str)) else None
+
+    # 1. Try finding case directory if explicitly specified
+    case_dir: Optional[Path] = None
+    if clean_cid:
+        for root in [Path("vaults"), Path("data"), get_vaults_root()]:
+            cand = root / clean_cid
+            if cand.is_dir():
+                case_dir = cand
+                break
+
+    # 2. If path starts with a case folder name, peel it off
+    if case_dir is None and len(raw_p.parts) > 1:
+        first = raw_p.parts[0]
+        for root in [Path("vaults"), Path("data"), get_vaults_root()]:
+            cand = root / first
+            if cand.is_dir():
+                case_dir = cand
+                raw_p = Path(*raw_p.parts[1:])
+                break
+
+    # 3. Default fallback to Case_01_Sonipat_Arms in vaults/ or data/
+    if case_dir is None:
+        for root in [Path("vaults"), Path("data"), get_vaults_root()]:
+            cand = root / "Case_01_Sonipat_Arms"
+            if cand.is_dir():
+                case_dir = cand
+                break
+
+    if case_dir is None:
+        case_dir = Path("vaults/Case_01_Sonipat_Arms")
+
+    # If raw_p still has the case_dir name as leading component, strip it
+    if len(raw_p.parts) > 0 and raw_p.parts[0] == case_dir.name:
+        raw_p = Path(*raw_p.parts[1:])
+
+    resolved_case_dir = case_dir.resolve()
+    full_path = (resolved_case_dir / raw_p).resolve()
+    return resolved_case_dir, full_path
+
+
 router = APIRouter(tags=["vault"])
 
 
@@ -356,5 +425,156 @@ def get_cases(
     vaults_root: Optional[str] = Query(None, description="Optional path to vaults root directory")
 ) -> list[dict[str, Any]]:
     """List available cases discovered in the vaults root."""
-    root = Path(vaults_root) if vaults_root is not None else get_vaults_root()
+    root = Path(vaults_root) if (vaults_root and isinstance(vaults_root, str)) else get_vaults_root()
     return list_cases(root)
+
+
+@router.get("/api/vault/tree")
+def get_vault_tree(
+    case_id: Optional[str] = Query(None, description="Case identifier or name"),
+) -> list[dict[str, Any]]:
+    """
+    Returns list of all files in the case vault with metadata.
+    Enables frontend to load real vault structure without requiring browser directory picker.
+    """
+    cid = case_id if (case_id and isinstance(case_id, str)) else None
+    case_dir, _ = resolve_case_file("dummy", case_id=cid)
+    if not case_dir.exists() or not case_dir.is_dir():
+        # Fallback to data directory
+        for root in [Path("data"), Path("vaults")]:
+            cand = root / (cid or "Case_01_Sonipat_Arms")
+            if cand.is_dir():
+                case_dir = cand
+                break
+
+    files_meta: list[dict[str, Any]] = []
+    if not case_dir.exists() or not case_dir.is_dir():
+        return files_meta
+
+    for p in sorted(case_dir.rglob("*")):
+        if p.is_file() and not p.name.startswith(".") and not p.name.endswith(".sha256"):
+            rel_path = str(p.relative_to(case_dir))
+            is_locked = "00_Raw_Inputs" in p.parts
+            role = None
+            if rel_path.startswith("01_People"):
+                stem = p.stem.lower()
+                if "vikram" in stem or "rehan" in stem or "sandeep" in stem or "balwinder" in stem:
+                    role = "accused"
+                elif "chander" in stem or "witness" in stem or "rohit" in stem:
+                    role = "witness"
+                elif "rajesh" in stem or "ramphal" in stem or "si " in stem or "inspector" in stem:
+                    role = "officer"
+                elif "suresh" in stem:
+                    role = "complainant"
+
+            files_meta.append({
+                "path": rel_path,
+                "name": p.name,
+                "size": p.stat().st_size,
+                "is_locked": is_locked,
+                "mtime": p.stat().st_mtime,
+                "role": role,
+                "type": "file",
+            })
+
+    return files_meta
+
+
+@router.get("/api/vault/note")
+def get_vault_note(
+    path: str = Query(..., description="Note relative path"),
+    case_id: Optional[str] = Query(None, description="Case ID"),
+):
+    """Reads and returns the note body and lock status."""
+    cid = case_id if (case_id and isinstance(case_id, str)) else None
+    case_dir, file_path = resolve_case_file(path, cid)
+    if not file_path.exists() or not file_path.is_file():
+        # Also check in data/ if not in vaults/
+        alt_root = Path("data") if "vaults" in case_dir.parts else Path("vaults")
+        alt_file = alt_root / case_dir.name / Path(path)
+        if alt_file.exists() and alt_file.is_file():
+            file_path = alt_file
+            case_dir = alt_root / case_dir.name
+        else:
+            raise HTTPException(status_code=404, detail=f"Note not found: {path}")
+
+    try:
+        content = file_path.read_text(encoding="utf-8", errors="replace")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read note: {e}")
+
+    is_locked = "00_Raw_Inputs" in file_path.parts
+    return {
+        "path": str(file_path.relative_to(case_dir)),
+        "name": file_path.name,
+        "content": content,
+        "is_locked": is_locked,
+        "mtime": file_path.stat().st_mtime,
+    }
+
+
+@router.post("/api/vault/note")
+def post_vault_note(
+    req: NoteWriteRequest,
+):
+    """
+    Saves note content to disk using safe_write (Law 1 protected).
+    Raises 403 HTTP PermissionError if target is in 00_Raw_Inputs/.
+    """
+    case_dir, file_path = resolve_case_file(req.path, req.case_id)
+
+    from brain.guard import is_path_locked, safe_write
+    if is_path_locked(file_path):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Law 1 Violation: Cannot write to '{file_path.name}'. Evidence in 00_Raw_Inputs/ is immutable.",
+        )
+
+    try:
+        safe_write(file_path, req.content)
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Write failed: {e}")
+
+    # Rebuild index incrementally for markdown notes
+    if file_path.suffix == ".md" and not file_path.name.startswith("_"):
+        try:
+            from brain.index.incremental import refresh_case_index
+            refresh_case_index(case_dir)
+        except Exception:
+            pass
+
+    return {
+        "status": "saved",
+        "path": str(file_path.relative_to(case_dir)),
+        "mtime": file_path.stat().st_mtime,
+    }
+
+
+@router.post("/api/vault/create")
+def post_vault_create(
+    req: NoteCreateRequest,
+):
+    """Creates a new note file in the vault."""
+    case_dir, file_path = resolve_case_file(req.path, req.case_id)
+
+    from brain.guard import is_path_locked, safe_write
+    if is_path_locked(file_path):
+        raise HTTPException(
+            status_code=403,
+            detail="Law 1 Violation: Cannot create files under 00_Raw_Inputs/.",
+        )
+
+    try:
+        safe_write(file_path, req.content or "")
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Create failed: {e}")
+
+    return {
+        "status": "created",
+        "path": str(file_path.relative_to(case_dir)),
+        "name": file_path.name,
+    }

@@ -3,17 +3,19 @@ import { fsSupported } from './fs/vault'
 import { useVault } from './state/useVault'
 import { useNoteIndex } from './state/useNoteIndex'
 import { FileTree } from './components/FileTree'
-import { Editor } from './components/Editor'
+import { Editor, type EditorMode } from './components/Editor'
 import { Workspace } from './components/Workspace'
 import { AppModals } from './components/AppModals'
 
 export function App() {
-  const [isPreviewOnly, setIsPreviewOnly] = useState(false)
+  const [editorMode, setEditorMode] = useState<EditorMode>('live-preview')
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
   const [isQuickSwitcherOpen, setIsQuickSwitcherOpen] = useState(false)
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false)
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const {
     vaultName, files, folders, activeFile, content,
@@ -24,16 +26,25 @@ export function App() {
 
   const noteContents = useNoteIndex(files, activeFile, content)
 
+  const cycleEditorMode = () => {
+    setEditorMode((prev) => {
+      if (prev === 'live-preview') return 'source'
+      if (prev === 'source') return 'reading'
+      return 'live-preview'
+    })
+  }
+
   const commands = useMemo(
     () => [
       { id: '1', label: 'Create new note', category: 'Note', action: () => setIsNoteModalOpen(true) },
       { id: '2', label: 'Create new folder', category: 'Folder', action: () => setIsFolderModalOpen(true) },
       { id: '3', label: 'Open note (Quick Switcher)...', category: 'Navigation', shortcut: '⌘O', action: () => setIsQuickSwitcherOpen(true) },
       { id: '4', label: 'Search in all notes...', category: 'Search', shortcut: '⌘⇧F', action: () => setIsGlobalSearchOpen(true) },
-      { id: '5', label: isPreviewOnly ? 'Exit preview-only view' : 'Toggle live preview only', category: 'View', shortcut: '⌘E', action: () => setIsPreviewOnly((p) => !p) },
+      { id: '5', label: `Cycle editor mode (currently ${editorMode})`, category: 'View', shortcut: '⌘E', action: cycleEditorMode },
       { id: '6', label: 'Open vault folder...', category: 'Vault', action: () => void openVault() },
+      { id: '7', label: 'Keyboard shortcuts...', category: 'Help', shortcut: '⌘/', action: () => setIsShortcutsOpen(true) },
     ],
-    [isPreviewOnly, openVault]
+    [editorMode, openVault]
   )
 
   useEffect(() => {
@@ -41,7 +52,7 @@ export function App() {
       const isCmdOrCtrl = e.metaKey || e.ctrlKey
       if (isCmdOrCtrl && e.key.toLowerCase() === 'e') {
         e.preventDefault()
-        setIsPreviewOnly((prev) => !prev)
+        cycleEditorMode()
       } else if (isCmdOrCtrl && e.key.toLowerCase() === 'p') {
         e.preventDefault()
         setIsCommandPaletteOpen((prev) => !prev)
@@ -51,10 +62,25 @@ export function App() {
       } else if (isCmdOrCtrl && e.key.toLowerCase() === 'o') {
         e.preventDefault()
         setIsQuickSwitcherOpen((prev) => !prev)
+      } else if (isCmdOrCtrl && (e.key === '/' || e.key === '?')) {
+        e.preventDefault()
+        setIsShortcutsOpen((prev) => !prev)
+      } else if (isCmdOrCtrl && e.key === ',') {
+        e.preventDefault()
+        setIsSettingsOpen((prev) => !prev)
       }
     }
+
+    const handleOpenShortcuts = () => setIsShortcutsOpen(true)
+    const handleOpenSettings = () => setIsSettingsOpen(true)
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('syndicate-brain:open-shortcuts', handleOpenShortcuts)
+    window.addEventListener('syndicate-brain:open-settings', handleOpenSettings)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('syndicate-brain:open-shortcuts', handleOpenShortcuts)
+      window.removeEventListener('syndicate-brain:open-settings', handleOpenSettings)
+    }
   }, [])
 
   const wordCount = useMemo(() => {
@@ -79,6 +105,7 @@ export function App() {
         activeFile={activeFile}
         wordCount={wordCount}
         saveStatus={saveStatus}
+        noteContents={noteContents}
         onSelectFile={(path) => void selectFile(path)}
         onOpenVault={() => void openVault()}
         onNewNote={() => setIsNoteModalOpen(true)}
@@ -97,7 +124,7 @@ export function App() {
         editor={
           <Editor
             content={content} activeFile={activeFile} files={files}
-            isPreviewOnly={isPreviewOnly} onChange={updateContent}
+            mode={editorMode} onChange={updateContent}
             onNavigateWikiLink={navigateWikiLink}
           />
         }
@@ -109,6 +136,7 @@ export function App() {
         isGlobalSearchOpen={isGlobalSearchOpen}
         isNoteModalOpen={isNoteModalOpen}
         isFolderModalOpen={isFolderModalOpen}
+        isShortcutsOpen={isShortcutsOpen}
         commands={commands}
         files={files}
         noteContents={noteContents}
@@ -120,6 +148,10 @@ export function App() {
         onCloseGlobalSearch={() => setIsGlobalSearchOpen(false)}
         onCloseNoteModal={() => setIsNoteModalOpen(false)}
         onCloseFolderModal={() => setIsFolderModalOpen(false)}
+        onCloseShortcuts={() => setIsShortcutsOpen(false)}
+        isSettingsOpen={isSettingsOpen}
+        vaultName={vaultName}
+        onCloseSettings={() => setIsSettingsOpen(false)}
       />
 
       <div className="window-too-small">

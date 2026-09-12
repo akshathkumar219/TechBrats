@@ -18,7 +18,7 @@ export function useNoteIndex(
       const updates: Record<string, string> = {}
       for (const file of missing) {
         try {
-          const text = await readFile(file.handle)
+          const text = await readFile(file)
           updates[file.path] = text
         } catch {
           // If reading fails, store empty string to prevent endless retries

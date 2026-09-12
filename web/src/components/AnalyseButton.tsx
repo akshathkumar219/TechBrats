@@ -31,6 +31,7 @@ export interface AnalyseButtonProps {
   caseId?: string
   onAnalysisComplete?: (result: AnalysisResult) => void
   className?: string
+  variant?: 'pill' | 'ribbon'
 }
 
 const AGENT_STAGES = [
@@ -47,45 +48,86 @@ const CSS = `
   position: relative;
 }
 
+.btn-analyse-ribbon-container {
+  position: relative;
+  display: inline-flex;
+}
+
+.btn-analyse-ribbon-btn {
+  width: var(--ws-icon, 30px);
+  height: var(--ws-icon, 30px);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  color: var(--text-muted);
+  position: relative;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+
+.btn-analyse-ribbon-btn:hover:not(:disabled) {
+  background: var(--bg-raised);
+  color: var(--text-primary);
+}
+
+.btn-analyse-ribbon-btn.is-running {
+  background: var(--bg-overlay);
+  color: var(--accent);
+}
+
+.btn-analyse-ribbon-btn.is-complete {
+  background: rgba(22, 163, 74, 0.15);
+  color: var(--ok);
+}
+
+.btn-analyse-ribbon-container .analyse-pipeline-tooltip {
+  top: 50%;
+  transform: translateY(-50%);
+  left: calc(100% + 8px);
+  right: auto;
+}
+
+
 .btn-analyse {
   display: inline-flex;
   align-items: center;
   gap: var(--s2);
-  padding: 5px 12px;
+  padding: 4px 10px;
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
-  font-weight: 600;
+  font-weight: 500;
   border-radius: var(--r-sm);
   cursor: pointer;
-  background-color: var(--accent);
-  color: var(--text-inverse);
-  border: 1px solid var(--accent);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  background-color: var(--bg-inset);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   transition: all var(--t-fast);
   user-select: none;
   white-space: nowrap;
 }
 
 .btn-analyse:hover:not(:disabled) {
-  background-color: var(--accent);
-  border-color: var(--accent);
-  box-shadow: 0 0 8px rgba(232, 176, 75, 0.45);
+  background-color: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .btn-analyse:disabled {
-  opacity: 0.65;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .btn-analyse.is-running {
   background-color: var(--bg-overlay);
-  color: var(--accent);
-  border-color: var(--accent);
-  box-shadow: 0 0 10px rgba(232, 176, 75, 0.25);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
 .btn-analyse.is-complete {
-  background-color: rgba(95, 167, 116, 0.15);
+  background-color: rgba(22, 163, 74, 0.12);
   color: var(--ok);
   border-color: var(--ok);
 }
@@ -94,7 +136,7 @@ const CSS = `
   display: inline-block;
   width: 10px;
   height: 10px;
-  border: 2px solid rgba(232, 176, 75, 0.3);
+  border: 2px solid var(--border-strong);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: analyse-spin 0.8s linear infinite;
@@ -175,11 +217,22 @@ export function AnalyseButton({
   caseId,
   onAnalysisComplete,
   className = '',
+  variant = 'pill',
 }: AnalyseButtonProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [agentIndex, setAgentIndex] = useState(0)
   const [successCount, setSuccessCount] = useState<number | null>(null)
   const [showTooltip, setShowTooltip] = useState(false)
+  const [showHoverTip, setShowHoverTip] = useState(false)
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const onMouseEnter = () => {
+    hoverTimerRef.current = setTimeout(() => setShowHoverTip(true), 80)
+  }
+  const onMouseLeave = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    setShowHoverTip(false)
+  }
 
   const activeTimerRef = useRef<number | null>(null)
   const isMountedRef = useRef(true)
@@ -190,6 +243,9 @@ export function AnalyseButton({
       isMountedRef.current = false
       if (activeTimerRef.current !== null) {
         window.clearTimeout(activeTimerRef.current)
+      }
+      if (hoverTimerRef.current !== null) {
+        clearTimeout(hoverTimerRef.current)
       }
     }
   }, [])
@@ -338,6 +394,68 @@ export function AnalyseButton({
   }, [isRunning, caseId, vaultName, onAnalysisComplete])
 
   const activeAgent = AGENT_STAGES[agentIndex]
+
+  if (variant === 'ribbon') {
+    return (
+      <div
+        className={`ws-ico-wrap btn-analyse-ribbon-container ${className}`}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+      >
+        <style>{CSS}</style>
+        <button
+          type="button"
+          className={`ws-ico btn-analyse-ribbon-btn ${isRunning ? 'is-running' : ''} ${successCount !== null ? 'is-complete' : ''}`}
+          onClick={handleAnalyse}
+          disabled={isRunning}
+          aria-label="Make AI Synthesis"
+          aria-busy={isRunning}
+          aria-live="polite"
+        >
+          {isRunning ? (
+            <span className="btn-analyse-agent-pulse" aria-hidden="true" />
+          ) : successCount !== null ? (
+            <span aria-hidden="true" style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--ok)' }}>✓</span>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3l1.8 5.4a2 2 0 0 0 1.2 1.2l5.4 1.8-5.4 1.8a2 2 0 0 0-1.2 1.2L12 21l-1.8-5.4a2 2 0 0 0-1.2-1.2L3.6 12.6l5.4-1.8a2 2 0 0 0 1.2-1.2L12 3z" />
+              <path d="M19 3v4M21 5h-4" />
+            </svg>
+          )}
+        </button>
+
+        {/* Ribbon hover tooltip when idle */}
+        {showHoverTip && !isRunning && (
+          <div className="ws-tooltip" role="tooltip">
+            <span>{successCount !== null ? `Analysis Complete (${successCount} proposals)` : 'Make AI Synthesis'}</span>
+          </div>
+        )}
+
+        {/* Live Agent Sequence Tooltip / Pipeline Indicator */}
+        {isRunning && showTooltip && (
+          <div className="analyse-pipeline-tooltip" role="status" aria-label="Investigation Agent Pipeline">
+            <div className="analyse-pipeline-header">Agent Layer Pipeline (Laws 2, 3, 4)</div>
+            <div className="analyse-pipeline-steps">
+              {AGENT_STAGES.map((stage, i) => {
+                const isDone = i < agentIndex
+                const isCurr = i === agentIndex
+                return (
+                  <div
+                    key={stage.id}
+                    className={`analyse-pipeline-step ${isDone ? 'is-done' : ''} ${isCurr ? 'is-active' : ''}`}
+                  >
+                    <span aria-hidden="true">{isDone ? '✓' : isCurr ? '▶' : '○'}</span>
+                    <span>{stage.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className={`btn-analyse-container ${className}`}>

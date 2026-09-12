@@ -702,6 +702,19 @@ export class CytoscapeGraphEngine {
   }
 
   /**
+   * Resizes viewport to match container bounds and fits visible nodes.
+   */
+  public resize(): void {
+    if (!this.cy || this.isDestroyed) return
+    try {
+      this.cy.resize()
+      this.fitTo()
+    } catch {
+      // Ignore in headless
+    }
+  }
+
+  /**
    * Subscribes to selection changes.
    * Returns unsubscribe cleanup function.
    */

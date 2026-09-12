@@ -11,11 +11,6 @@ import type {
 import { getOfflineCaseResponse } from './utils'
 import { validateText } from './validator'
 
-const SUGGESTED_PROMPTS = [
-  'Who is Vikram Singh?',
-  'What vehicles are linked to Rehan Khan?',
-  'Summarize Sonipat arms seizure',
-] as const
 
 /**
  * CopilotPanel — Right-rail investigative copilot panel.
@@ -200,7 +195,12 @@ export function CopilotPanel({
 
         const data: CopilotResponse = await res.json()
         const validation = validateText(data.answer, data.notes_retrieved)
-        const sanitizedAnswer = validation.surviving_text || data.answer
+        let sanitizedAnswer = validation.surviving_text
+        if (!sanitizedAnswer && data.citations && data.citations.length > 0) {
+          sanitizedAnswer = data.answer
+        } else if (!sanitizedAnswer) {
+          sanitizedAnswer = data.answer
+        }
         streamResponse(botMsgId, { ...data, answer: sanitizedAnswer })
       } catch (err: unknown) {
         console.warn(
@@ -294,7 +294,6 @@ export function CopilotPanel({
             </svg>
           </span>
           <span className="copilot-header-title">Copilot</span>
-          <span className="copilot-header-badge">Law 4</span>
         </div>
 
         <div className="copilot-header-actions">
@@ -386,28 +385,7 @@ export function CopilotPanel({
                 <path d="M14.5 14h.01" />
               </svg>
             </div>
-            <div className="copilot-empty-title">Investigative Copilot</div>
-            <div className="copilot-empty-desc">
-              Answers grounded directly in <code style={{ fontFamily: 'var(--font-mono)' }}>_Case_Index.md</code>.
-              Every assertion carries verifiable source citations under Law 4.
-            </div>
-
-            <div className="copilot-suggestions-header">Suggested queries</div>
-            <div className="copilot-suggestions">
-              {SUGGESTED_PROMPTS.map((promptText) => (
-                <button
-                  key={promptText}
-                  type="button"
-                  className="copilot-suggestion-btn"
-                  onClick={() => handleSend(promptText)}
-                >
-                  <span>{promptText}</span>
-                  <span className="copilot-suggestion-arrow" aria-hidden="true">
-                    →
-                  </span>
-                </button>
-              ))}
-            </div>
+            <div className="copilot-empty-title">RAG Agent</div>
           </div>
         ) : (
           messages.map((m) => (
@@ -433,6 +411,9 @@ export function CopilotPanel({
         >
           <div className="copilot-input-row">
             <textarea
+              id="copilot-query-input"
+              name="copilot_query"
+              aria-label="Ask Copilot a question about this case"
               ref={textareaRef}
               className="copilot-textarea"
               rows={1}
@@ -440,7 +421,7 @@ export function CopilotPanel({
               placeholder={
                 !caseId || !isCaseOpen
                   ? 'Open a case to query copilot...'
-                  : 'Ask about suspects, CDR links, FIR records...'
+                  : 'Ask anything'
               }
               onChange={(e) => updateDraft(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -464,17 +445,18 @@ export function CopilotPanel({
                 strokeLinejoin="round"
                 aria-hidden="true"
               >
-                <path d="M4 12l16-8-6 8 6 8z" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
               </svg>
             </button>
           </div>
 
           <div className="copilot-form-footer">
-            <span className="copilot-hint">
-              Enter to send · Shift+Enter for newline
+            <span className="copilot-hint-left">
+              Enter to send
             </span>
-            <span className="copilot-law-badge">
-              Law 4 Enforced
+            <span className="copilot-hint-right">
+              Shift+Enter for newline
             </span>
           </div>
         </form>

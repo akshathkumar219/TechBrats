@@ -118,6 +118,53 @@ export const editorTheme = EditorView.theme(
     },
 
     '.cm-placeholder': { color: 'var(--text-faint)' },
+
+    // Live preview markdown styles
+    '.cm-strong': { fontWeight: '600', color: 'var(--text-primary)' },
+    '.cm-em': { fontStyle: 'italic', color: 'var(--text-primary)' },
+    '.cm-strikethrough': { textDecoration: 'line-through', color: 'var(--text-muted)' },
+    '.cm-inline-code': {
+      fontFamily: 'var(--font-mono)',
+      fontSize: '0.92em',
+      backgroundColor: 'var(--bg-overlay)',
+      border: '1px solid var(--border)',
+      padding: '1px 5px',
+      borderRadius: 'var(--r-sm)',
+      color: 'var(--info)',
+    },
+    '.cm-link-text': {
+      color: 'var(--accent)',
+      textDecoration: 'underline',
+      textUnderlineOffset: '2px',
+    },
+    '.cm-wikilink': {
+      color: 'var(--accent)',
+      textDecoration: 'underline',
+      textUnderlineOffset: '2px',
+      fontWeight: '500',
+      cursor: 'pointer',
+    },
+    '.cm-task-checkbox': {
+      marginRight: 'var(--s2)',
+      accentColor: 'var(--accent)',
+      cursor: 'pointer',
+      verticalAlign: 'middle',
+    },
+    '.cm-hr': {
+      border: 'none',
+      borderTop: '1px solid var(--border)',
+      margin: 'var(--s3) 0',
+      width: '100%',
+    },
+    '.cm-formatting-blockquote': {
+      borderLeft: '3px solid var(--border-strong)',
+      paddingLeft: 'var(--s3) !important',
+      color: 'var(--text-muted)',
+    },
+    '.cm-frontmatter-widget': {
+      marginBottom: 'var(--s4)',
+      cursor: 'pointer',
+    },
   },
   { dark: true }
 )

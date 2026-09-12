@@ -13,6 +13,16 @@ export interface TreeNode {
   isLocked?: boolean
 }
 
+export function getFolderDisplayName(name: string): string {
+  const m = name.match(/^Case_0?(\d+)(?:_(.*))?$/i)
+  if (m) {
+    const num = parseInt(m[1], 10)
+    const suffix = m[2] ? ` · ${m[2].replace(/_/g, ' ')}` : ''
+    return `Case ${num}${suffix}`
+  }
+  return name
+}
+
 export function getFolderIcon(name: string): string {
   if (name.startsWith('00_Raw_Inputs')) return '🔒'
   if (name.startsWith('01_People')) return '👤'
@@ -22,7 +32,7 @@ export function getFolderIcon(name: string): string {
   if (name.startsWith('05_Organisations')) return '🏢'
   if (name.startsWith('06_Events')) return '📅'
   if (name.startsWith('07_AI_Synthesis')) return '✨'
-  if (name.startsWith('Case_')) return '🗂️'
+  if (name.startsWith('Case_') || name.startsWith('Case ')) return '📁'
   return '📁'
 }
 
@@ -259,7 +269,7 @@ export function buildFileTree(
         if (!folderNode) {
           folderNode = {
             name: part,
-            displayName: part.replace(/_/g, ' '),
+            displayName: getFolderDisplayName(part),
             path: currentPath,
             isFolder: true,
             icon: getFolderIcon(part),
@@ -288,7 +298,7 @@ export function buildFileTree(
       if (!folderNode) {
         folderNode = {
           name: part,
-          displayName: part.replace(/_/g, ' '),
+          displayName: getFolderDisplayName(part),
           path: currentPath,
           isFolder: true,
           icon: getFolderIcon(part),

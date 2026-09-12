@@ -157,8 +157,11 @@ Another uncited claim about suspect operations here.`
     )
   })
 
-  it('openFileAt dispatches syndicate-brain:open-file-at and invokes window.openFileAt if defined', () => {
-    let windowCalledWith: { path: string; line?: number; span?: [number, number] } | null = null
+  it('openFileAt (re-exported from the canonical HAR-T06 workspace/navigation) dispatches syndicate-brain:open-file-at', () => {
+    // HAR-T06 unification: copilot/navigation.ts no longer reimplements
+    // openFileAt or calls window.openFileAt itself — it re-exports the single
+    // canonical implementation from workspace/navigation.ts, which dispatches
+    // the shared event and self-registers on window.
     let eventDetail: any = null
 
     // Mock window environment
@@ -166,9 +169,6 @@ Another uncited claim about suspect operations here.`
     const eventTarget = new EventTarget()
 
     const mockWindow = {
-      openFileAt: (path: string, line?: number, span?: [number, number]) => {
-        windowCalledWith = { path, line, span }
-      },
       dispatchEvent: (event: CustomEvent) => {
         if (event.type === 'syndicate-brain:open-file-at') {
           eventDetail = event.detail
@@ -189,11 +189,6 @@ Another uncited claim about suspect operations here.`
     try {
       openFileAt('00_Raw_Inputs/FIR/FIR_0142_2026_Kharkhoda.md', 9, [9, 15])
 
-      assert.deepStrictEqual(windowCalledWith, {
-        path: '00_Raw_Inputs/FIR/FIR_0142_2026_Kharkhoda.md',
-        line: 9,
-        span: [9, 15],
-      })
       assert.deepStrictEqual(eventDetail, {
         path: '00_Raw_Inputs/FIR/FIR_0142_2026_Kharkhoda.md',
         line: 9,

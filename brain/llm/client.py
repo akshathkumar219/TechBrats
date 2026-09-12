@@ -118,11 +118,15 @@ class OllamaClient(LLMClient):
         response_schema: Type[T],
         system_prompt: Optional[str] = None,
     ) -> T:
-        schema_json = json.dumps(response_schema.model_json_schema(), indent=2)
+        schema_dict = response_schema.model_json_schema()
+        schema_json = json.dumps(schema_dict, indent=2)
+        props = list(schema_dict.get("properties", {}).keys())
+        example_keys = ", ".join(f'"{k}": ...' for k in props)
         base_system = (
             "You are an offline analytical intelligence engine for law enforcement.\n"
             "You must output ONLY raw, valid JSON matching the following JSON Schema:\n"
             f"{schema_json}\n"
+            f"Expected JSON object format: {{{example_keys}}}\n"
             "Do not output markdown code fences, greetings, or explanations. Only the JSON object."
         )
         effective_system = f"{base_system}\n{system_prompt}" if system_prompt else base_system
@@ -132,12 +136,26 @@ class OllamaClient(LLMClient):
             {"role": "user", "content": prompt},
         ]
 
+        def _parse_and_validate(raw_str: str) -> T:
+            cleaned_str = clean_json_text(raw_str)
+            try:
+                parsed = json.loads(cleaned_str)
+                if isinstance(parsed, dict):
+                    if "properties" in parsed and isinstance(parsed["properties"], dict):
+                        for k in props:
+                            if k in parsed["properties"]:
+                                parsed[k] = parsed["properties"][k]
+                    if len(props) == 1 and props[0] not in parsed and len(parsed) == 1:
+                        parsed[props[0]] = next(iter(parsed.values()))
+                return response_schema.model_validate(parsed)
+            except Exception:
+                return response_schema.model_validate_json(cleaned_str)
+
         # Attempt 1
         raw_output = ""
         try:
             raw_output = self._call_api(messages)
-            cleaned = clean_json_text(raw_output)
-            return response_schema.model_validate_json(cleaned)
+            return _parse_and_validate(raw_output)
         except (ValidationError, json.JSONDecodeError, Exception) as first_err:
             logger.warning(
                 f"Ollama attempt 1 failed validation for {response_schema.__name__}: {first_err}. "
@@ -159,8 +177,7 @@ class OllamaClient(LLMClient):
 
             try:
                 second_output = self._call_api(retry_messages)
-                cleaned_retry = clean_json_text(second_output)
-                return response_schema.model_validate_json(cleaned_retry)
+                return _parse_and_validate(second_output)
             except Exception as second_err:
                 logger.error(f"Ollama retry failed for {response_schema.__name__}: {second_err}")
                 raise ValueError(

@@ -3,15 +3,18 @@
  *
  * Provides:
  * 1. openFileAt(path: string, line?: number, span?: [number, number])
- *    Opens the file in the editor, scrolls to the line, highlights the span.
- *    Invokes window.openFileAt if registered (HAR-T06 host) and dispatches
- *    'syndicate-brain:open-file-at' CustomEvent.
+ *    Re-exported from the canonical HAR-T06 implementation in
+ *    ../workspace/navigation.ts — the single source of truth for opening a
+ *    file, switching to the editor pane, scrolling to a line, and
+ *    highlighting a span. Do not reimplement here.
  * 2. parseLocator(locator?: string | null)
  *    Deterministic locator parser for CDR ("row:48219"), documents ("p:2 l:9"),
  *    and line ranges ("p:1 l:4-12", "l:14-25").
  * 3. resolveCitationPath(source: string, retrievedNotes?: string[])
  *    Maps evidentiary source identifiers (e.g. DOC_FIR_0142) to target note files.
  */
+
+export { openFileAt } from '../workspace/navigation.ts'
 
 export interface ParsedLocator {
   line?: number
@@ -124,73 +127,3 @@ export function resolveCitationPath(source: string, retrievedNotes?: string[]): 
   return source
 }
 
-/**
- * openFileAt(path: string, line?: number, span?: [number, number])
- * Opens the note, scrolls to line, and highlights the span.
- *
- * First invokes window.openFileAt if registered (HAR-T06 host),
- * then dispatches 'syndicate-brain:open-file-at' CustomEvent with full details.
- */
-export function openFileAt(
-  path: string,
-  line?: number,
-  span?: [number, number]
-): void {
-  const targetLine = line !== undefined ? line : 1
-
-  // 1. Call global openFileAt if registered on window (HAR-T06 right-rail host / workspace)
-  const win = typeof window !== 'undefined' ? (window as unknown as {
-    openFileAt?: (p: string, l?: number, s?: [number, number]) => void
-  }) : null
-
-  if (win && typeof win.openFileAt === 'function') {
-    try {
-      win.openFileAt(path, targetLine, span)
-    } catch (err) {
-      console.warn('[openFileAt] Error invoking window.openFileAt:', err)
-    }
-  }
-
-  // 2. Dispatch primary navigation event
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(
-      new CustomEvent('syndicate-brain:open-file-at', {
-        detail: {
-          path,
-          line: targetLine,
-          span,
-        },
-        bubbles: true,
-        composed: true,
-      })
-    )
-
-    // 3. Dispatch backward-compatible open-file event
-    window.dispatchEvent(
-      new CustomEvent('syndicate-brain:open-file', {
-        detail: {
-          path,
-          line: targetLine,
-          span,
-        },
-        bubbles: true,
-        composed: true,
-      })
-    )
-
-    // 4. Dispatch citation navigation event
-    window.dispatchEvent(
-      new CustomEvent('syndicate-brain:open-citation', {
-        detail: {
-          source_doc_id: path,
-          locator: line ? `l:${line}` : undefined,
-          line: targetLine,
-          span,
-          path,
-        },
-        bubbles: true,
-        composed: true,
-      })
-    )
-  }
-}

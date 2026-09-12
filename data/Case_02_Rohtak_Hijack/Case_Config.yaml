@@ -6,4 +6,5 @@ model_name: llama3
 resolution_thresholds:
   phonetic: 0.85
   temporal_window_hours: 48
+  cdr_min_cluster_calls: 10
 tool_version: 0.1.0

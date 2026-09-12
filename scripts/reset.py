@@ -9,8 +9,10 @@ in under 20 seconds.
 
 Options:
   --case <name>        Case folder name (default: Case_01_Sonipat_Arms)
-  --target-dir <dir>   Target vaults directory (default: vaults)
-  --source-dir <dir>   Source pristine data directory (default: data)
+  --target-dir <dir>   Target case directory (default: data — this is what the
+                        live app actually resolves and serves; see BUG #3 note
+                        on validate_safety() for why this changed from "vaults")
+  --source-dir <dir>   Source pristine template directory (default: data/_pristine)
   --cached             Prepares cached model proposals/responses in 07_AI_Synthesis/
   --dry-run            Simulate operations without touching disk
 """
@@ -46,13 +48,36 @@ def validate_safety(
     case_name: str,
 ) -> tuple[Path, Path]:
     """
-    Safety checks to guarantee reset NEVER wipes anything outside the designated vaults directory.
+    Safety checks to guarantee reset NEVER wipes anything outside the designated
+    case-vault target directory, and never touches the pristine template or the
+    repo's code/docs/tests.
 
     Rules:
     1. case_name cannot be empty, '.', '..', or contain path separators ('/', '\\').
     2. target_dir must resolve to a valid path distinct from repo root, root '/', or user home.
     3. case_path must be strictly directly inside target_dir.
-    4. case_path cannot be repo root, user home, system root, or inside source/app dirs (data/, brain/, etc.).
+    4. case_path cannot be repo root, user home, system root, or inside code/doc/test dirs.
+    5. case_path can never be, or be inside, the pristine template directory
+       (data/_pristine/) — that is the read-only donor reset copies FROM, and
+       must never be a wipe target.
+    6. case_path can never be `data/` itself (the bare data directory) — only
+       a named case folder directly under it may be reset.
+
+    NOTE on architecture (BUG #3 fix, SIH26189):
+    Earlier, this defaulted to target_dir="vaults", but the live app
+    (brain/orchestrator.py::resolve_case_dir, brain/integrity.py::resolve_case_dir)
+    actually resolves and serves the case from data/Case_01_Sonipat_Arms directly.
+    `vaults/` create_case/open_case machinery (brain/vault.py, SHO-T01) was never
+    adopted as the live path. So `data/Case_01_Sonipat_Arms` is, today, both the
+    thing every endpoint reads/writes AND (historically) the "pristine" donor
+    reset copied from — those two roles can't share one path without reset
+    wiping its own source. The fix: keep a separate pristine snapshot at
+    data/_pristine/<case_name>/ as the read-only template, and make reset's
+    default target_dir="data" / source_dir="data/_pristine" so `make reset`
+    actually resets the same directory the live app serves. `data` is no
+    longer blanket-protected (a named case folder under it is precisely what
+    we now intend to reset) but the bare `data` directory and the pristine
+    template subtree remain protected, alongside brain/web/docs/scripts/tests/.git.
     """
     if not case_name or not case_name.strip():
         raise ValueError("Safety check failed: Case name cannot be empty.")
@@ -77,14 +102,30 @@ def validate_safety(
             f"Safety check failed: Case path '{case_path}' must be directly under '{target_dir_path}'."
         )
 
-    # Forbid targeting within code or source data directories of the repo
-    protected_subdirs = ["data", "brain", "web", "docs", "scripts", "tests", ".git"]
+    # Forbid targeting within code/doc/test directories of the repo (full subtree protection)
+    protected_subdirs = ["brain", "web", "docs", "scripts", "tests", ".git"]
     for protected in protected_subdirs:
         prot_path = (REPO_ROOT / protected).resolve()
         if prot_path == case_path or prot_path in case_path.parents:
             raise ValueError(
                 f"Safety check failed: Refusing to wipe protected repository path '{case_path}'."
             )
+
+    # The bare `data/` directory itself may never be the wipe target (only a
+    # named case folder directly under it may be).
+    data_path = (REPO_ROOT / "data").resolve()
+    if case_path == data_path:
+        raise ValueError(
+            f"Safety check failed: Refusing to wipe protected repository path '{case_path}'."
+        )
+
+    # The pristine template subtree is the read-only donor reset copies FROM —
+    # it must never itself be a wipe target, however target_dir is configured.
+    pristine_path = (REPO_ROOT / "data" / "_pristine").resolve()
+    if case_path == pristine_path or pristine_path in case_path.parents or case_path in pristine_path.parents:
+        raise ValueError(
+            f"Safety check failed: Refusing to wipe protected pristine template path '{case_path}'."
+        )
 
     return target_dir_path, case_path
 
@@ -255,8 +296,8 @@ def setup_cached_responses(
 
 def reset_case(
     case_name: str = "Case_01_Sonipat_Arms",
-    target_dir: Union[str, Path] = "vaults",
-    source_dir: Union[str, Path] = "data",
+    target_dir: Union[str, Path] = "data",
+    source_dir: Union[str, Path] = "data/_pristine",
     cached: bool = False,
     dry_run: bool = False,
 ) -> dict[str, Any]:
@@ -276,6 +317,17 @@ def reset_case(
     target_dir_path, target_case_path = validate_safety(target_dir, case_name)
     source_dir_path = Path(source_dir).resolve()
     source_case_path = (source_dir_path / case_name).resolve()
+
+    # Self-wipe guard: source and target can never be the same directory, or
+    # wipe_demo_case would delete the pristine data before copy_pristine_case
+    # ever reads it. (This is what stops source_dir="data" / target_dir="data"
+    # from destroying the donor case.)
+    if source_case_path == target_case_path:
+        raise ValueError(
+            "Safety check failed: source_case_path and target_case_path are identical "
+            f"('{source_case_path}'). Reset would wipe its own pristine source. "
+            "source_dir and target_dir must resolve to different directories."
+        )
 
     # Wipe existing
     wipe_demo_case(target_case_path, dry_run=dry_run)
@@ -330,13 +382,13 @@ def main() -> int:
     )
     parser.add_argument(
         "--target-dir",
-        default="vaults",
-        help="Target vaults directory (default: vaults)",
+        default="data",
+        help="Target case directory (default: data — the directory the live app actually serves)",
     )
     parser.add_argument(
         "--source-dir",
-        default="data",
-        help="Source pristine case data directory (default: data)",
+        default="data/_pristine",
+        help="Source pristine template directory (default: data/_pristine)",
     )
     parser.add_argument(
         "--cached",

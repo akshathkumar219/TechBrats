@@ -3,6 +3,8 @@ import { PromptModal } from './PromptModal'
 import { QuickSwitcher } from './QuickSwitcher'
 import { GlobalSearch } from './GlobalSearch'
 import { CommandPalette, type WorkbenchCommand } from './CommandPalette'
+import { ShortcutsModal } from './ShortcutsModal'
+import { SettingsModal } from './SettingsModal'
 
 interface AppModalsProps {
   isCommandPaletteOpen: boolean
@@ -10,6 +12,9 @@ interface AppModalsProps {
   isGlobalSearchOpen: boolean
   isNoteModalOpen: boolean
   isFolderModalOpen: boolean
+  isShortcutsOpen?: boolean
+  isSettingsOpen?: boolean
+  vaultName?: string | null
   commands: WorkbenchCommand[]
   files: VaultFile[]
   noteContents: Record<string, string>
@@ -21,6 +26,8 @@ interface AppModalsProps {
   onCloseGlobalSearch: () => void
   onCloseNoteModal: () => void
   onCloseFolderModal: () => void
+  onCloseShortcuts?: () => void
+  onCloseSettings?: () => void
 }
 
 export function AppModals({
@@ -29,6 +36,9 @@ export function AppModals({
   isGlobalSearchOpen,
   isNoteModalOpen,
   isFolderModalOpen,
+  isShortcutsOpen = false,
+  isSettingsOpen = false,
+  vaultName = null,
   commands,
   files,
   noteContents,
@@ -40,6 +50,8 @@ export function AppModals({
   onCloseGlobalSearch,
   onCloseNoteModal,
   onCloseFolderModal,
+  onCloseShortcuts,
+  onCloseSettings,
 }: AppModalsProps) {
   return (
     <>
@@ -77,6 +89,15 @@ export function AppModals({
         confirmLabel="Create Folder"
         onConfirm={(path) => void onCreateNewFolder(path)}
         onClose={onCloseFolderModal}
+      />
+      <ShortcutsModal
+        isOpen={isShortcutsOpen}
+        onClose={onCloseShortcuts ?? (() => {})}
+      />
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        vaultName={vaultName}
+        onClose={onCloseSettings ?? (() => {})}
       />
     </>
   )

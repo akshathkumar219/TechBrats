@@ -233,12 +233,12 @@ export function EdgeInspector({
           <EmptyState
             headline="Provenance Inspector"
             body="Select an edge or connection in the graph to inspect provenance and source citation."
-            action={
-              <div className="edge-inspector-empty-law3-badge">
-                LAW 3: Every link carries its reason and locator
-              </div>
-            }
+            icon={null}
+            compact
           />
+          <div className="edge-inspector-empty-law3-badge">
+            LAW 3: Every link carries its reason and locator
+          </div>
         </div>
       </aside>
     )

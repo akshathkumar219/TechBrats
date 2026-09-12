@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test --experimental-strip-types $(find src -name '*.test.ts') && npx tsx --test $(find src -name '*.test.tsx')"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -22,6 +23,7 @@
     "codemirror": "^6.0.2",
     "cytoscape": "^3.34.3",
     "cytoscape-cose-bilkent": "^4.1.0",
+    "force-graph": "^1.51.4",
     "idb-keyval": "^6.3.0",
     "marked": "^18.0.12",
     "react": "^19.2.8",
@@ -35,6 +37,7 @@
     "@types/wicg-file-system-access": "^2023.10.7",
     "@vitejs/plugin-react": "^6.1.1",
     "oxlint": "^1.81.0",
+    "tsx": "^4.23.13",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
   }

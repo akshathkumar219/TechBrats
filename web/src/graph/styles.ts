@@ -70,18 +70,56 @@ export const GRAPH_TOKENS = {
   eUnknownBg: 'var(--e-unknown-bg, rgba(90, 97, 107, 0.18))',
 } as const
 
+const TOKEN_FALLBACKS: Record<string, string> = {
+  '--evidence': '#E8B04B',
+  '--evidence-dim': '#8A6B2E',
+  '--evidence-bg': 'rgba(232, 176, 75, 0.18)',
+  '--hypothesis': '#C2569E',
+  '--hypothesis-bg': 'rgba(194, 86, 158, 0.18)',
+  '--danger': '#D4574E',
+  '--danger-bg': 'rgba(212, 87, 78, 0.18)',
+  '--ok': '#5FA774',
+  '--info': '#5B8FC7',
+  '--bg-void': '#0B0C0E',
+  '--bg-base': '#131519',
+  '--bg-raised': '#1A1D22',
+  '--bg-overlay': '#22262C',
+  '--bg-inset': '#0E1013',
+  '--border': '#2A2F36',
+  '--border-strong': '#3A414A',
+  '--border-focus': '#E8B04B',
+  '--text-primary': '#E6E8EA',
+  '--text-body': '#C4C9CF',
+  '--text-muted': '#8A9099',
+  '--text-faint': '#5A616B',
+  '--text-inverse': '#0B0C0E',
+  '--e-person': '#E8B04B',
+  '--e-phone': '#7FB3D5',
+  '--e-device': '#6FA8A0',
+  '--e-vehicle': '#B08CD9',
+  '--e-location': '#8FBF7F',
+  '--e-tower': '#5FA774',
+  '--e-org': '#D98C5F',
+  '--e-fir': '#9AA3AD',
+  '--e-event': '#D4574E',
+  '--e-unknown': '#5A616B',
+}
+
 /**
  * Resolves a CSS variable token to a concrete color string.
  * In a browser DOM context: reads computed style from container or documentElement.
  * In Node / headless context: extracts the fallback token value.
  */
 export function resolveToken(token: string, container?: HTMLElement | null): string {
-  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const el = container || document.documentElement
-    const varMatch = token.match(/^var\((--[a-zA-Z0-9_-]+)/)
-    if (varMatch) {
+  const varMatch = token.match(/^var\((--[a-zA-Z0-9_-]+)/)
+  if (varMatch) {
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const el = container || document.documentElement
       const computed = getComputedStyle(el).getPropertyValue(varMatch[1]).trim()
       if (computed) return computed
+    }
+    if (TOKEN_FALLBACKS[varMatch[1]]) {
+      return TOKEN_FALLBACKS[varMatch[1]]
     }
   }
 
