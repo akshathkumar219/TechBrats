@@ -6,3 +6,4 @@
 export * from './types.ts'
 export * from './parse.ts'
 export * from './engine.ts'
+export * from './GraphPane.tsx'

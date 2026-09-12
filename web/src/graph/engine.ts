@@ -109,6 +109,8 @@ export class CytoscapeGraphEngine {
   private activeFilterPredicate: ((element: NodeSingular | EdgeSingular) => boolean) | null = null
   private activeTopNLimit: number | null = null
   private leadsVisible = true
+  private _isFocusActive = false
+  private disposables: (() => void)[] = []
 
   constructor(container?: HTMLElement | null, data?: GraphData, options?: EngineOptions) {
     this.options = {
@@ -233,6 +235,36 @@ export class CytoscapeGraphEngine {
     this.cy.on('select unselect', 'node, edge', (_evt: EventObject) => {
       emitSelection()
     })
+
+    // Keyboard shortcuts per AKT-T05:
+    // 'F' on selected node dims >1 hop away; 'Escape' clears focus mode
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (this.isDestroyed || !this.cy) return
+      const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase()
+      if (targetTag === 'input' || targetTag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) {
+        return
+      }
+
+      if (e.key === 'f' || e.key === 'F') {
+        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+          const selectedNodes = this.cy.nodes(':selected')
+          if (selectedNodes.length > 0) {
+            e.preventDefault()
+            this.focusNode(selectedNodes[0].id())
+          }
+        }
+      } else if (e.key === 'Escape') {
+        if (this._isFocusActive) {
+          e.preventDefault()
+          this.clearFocus()
+        }
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', handleKeyDown)
+      this.disposables.push(() => window.removeEventListener('keydown', handleKeyDown))
+    }
   }
 
   /**
@@ -450,6 +482,13 @@ export class CytoscapeGraphEngine {
   }
 
   /**
+   * Returns whether focus mode is currently active.
+   */
+  public isFocusActive(): boolean {
+    return this._isFocusActive
+  }
+
+  /**
    * Center and focus on a specific node by ID, highlighting it and dimming
    * elements more than 1 hop away per design-system.md §4 (15% opacity).
    */
@@ -459,6 +498,7 @@ export class CytoscapeGraphEngine {
     const target = this.cy.getElementById(id)
     if (!target || target.length === 0) return
 
+    this._isFocusActive = true
     this.cy.batch(() => {
       // 1-hop neighborhood
       const neighborhood = target.closedNeighborhood()
@@ -489,6 +529,7 @@ export class CytoscapeGraphEngine {
    */
   public clearFocus(): void {
     if (!this.cy || this.isDestroyed) return
+    this._isFocusActive = false
     this.cy.batch(() => {
       this.cy!.elements().removeClass('sb-dimmed')
     })
@@ -700,6 +741,15 @@ export class CytoscapeGraphEngine {
   public destroy(): void {
     if (this.isDestroyed) return
     this.isDestroyed = true
+
+    for (const d of this.disposables) {
+      try {
+        d()
+      } catch {
+        // ignore
+      }
+    }
+    this.disposables = []
 
     this.selectionListeners.clear()
     if (this.container) {

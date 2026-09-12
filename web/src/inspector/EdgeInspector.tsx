@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import './inspector.css'
+import { openFileAt } from '../workspace/navigation'
+import { EmptyState } from '../states'
 import {
   type EdgeInspectorProps,
   type InspectableEdge,
@@ -129,12 +131,19 @@ export function EdgeInspector({
     const line = lineNumber
     const span = edge.matchedSpan
 
-    // 1. Props callback
+    // 1. Direct call to exported openFileAt per AKT-T05 / HAR-T06
+    try {
+      openFileAt(sourceDoc, line ?? 1, span)
+    } catch (err) {
+      console.warn('[EdgeInspector] openFileAt call failed:', err)
+    }
+
+    // 2. Props callback
     if (onOpenSource) {
       onOpenSource(sourceDoc, line, span)
     }
 
-    // 2. Global window function if registered
+    // 3. Global window function if registered
     const win = typeof window !== 'undefined' ? (window as unknown as { openFileAt?: (path: string, line?: number, span?: [number, number]) => void }) : null
     if (win && typeof win.openFileAt === 'function') {
       try {
@@ -142,17 +151,6 @@ export function EdgeInspector({
       } catch (err) {
         console.warn('[EdgeInspector] window.openFileAt call failed:', err)
       }
-    }
-
-    // 3. Try dynamic import from workspace navigation if present (HAR-T06 step 29)
-    try {
-      const nav = await import(/* @vite-ignore */ '../workspace/navigation').catch(() => null)
-      if (nav && typeof nav.openFileAt === 'function') {
-        const navFn = nav.openFileAt as (p: string, l?: number, s?: [number, number]) => void
-        navFn(sourceDoc, line, span)
-      }
-    } catch {
-      // workspace navigation not yet bundled
     }
 
     // 4. Always dispatch events for workbench decoupling
@@ -232,20 +230,15 @@ export function EdgeInspector({
         </div>
 
         <div className="edge-inspector-empty">
-          <div className="edge-inspector-empty-icon" aria-hidden="true">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="6" cy="6" r="3" />
-              <circle cx="18" cy="18" r="3" />
-              <line x1="8.5" y1="8.5" x2="15.5" y2="15.5" />
-            </svg>
-          </div>
-          <h3 className="edge-inspector-empty-title">Provenance Inspector</h3>
-          <p className="edge-inspector-empty-desc">
-            Select an edge or connection in the graph to inspect provenance and source citation.
-          </p>
-          <div className="edge-inspector-empty-law3-badge">
-            LAW 3: Every link carries its reason and locator
-          </div>
+          <EmptyState
+            headline="Provenance Inspector"
+            body="Select an edge or connection in the graph to inspect provenance and source citation."
+            action={
+              <div className="edge-inspector-empty-law3-badge">
+                LAW 3: Every link carries its reason and locator
+              </div>
+            }
+          />
         </div>
       </aside>
     )
@@ -385,7 +378,14 @@ export function EdgeInspector({
             <div className="edge-inspector-meta-grid">
               <span className="edge-inspector-meta-label">Locator:</span>
               <div className="edge-inspector-meta-value">
-                <span className="edge-inspector-locator-chip">{locator}</span>
+                <button
+                  type="button"
+                  className="edge-inspector-locator-chip is-clickable"
+                  onClick={handleOpenInSource}
+                  title={`Open source at ${locator}`}
+                >
+                  {locator}
+                </button>
               </div>
 
               <span className="edge-inspector-meta-label">Ingested:</span>

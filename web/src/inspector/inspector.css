@@ -326,6 +326,26 @@
   border: 1px solid var(--evidence-dim);
 }
 
+button.edge-inspector-locator-chip.is-clickable {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  transition: background-color var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
+}
+
+button.edge-inspector-locator-chip.is-clickable:hover {
+  background: var(--evidence);
+  color: var(--text-inverse);
+  border-color: var(--evidence);
+  transform: translateY(-1px);
+}
+
+button.edge-inspector-locator-chip.is-clickable:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+
 .edge-inspector-hash {
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
