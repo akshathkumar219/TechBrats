@@ -38,9 +38,35 @@ design we no longer build.
 
 ---
 
-## 0. Starting a session — paste this once, then your step
+## 0. The four messages — every task, every person
 
-Open Antigravity in the repo folder. First message of a new session:
+Replace everything in `<ANGLE BRACKETS>`. Same four messages for all six of you,
+every single task.
+
+### Message 1 — set up and branch
+
+Send this once per task, at the very start of a new Antigravity session.
+
+```
+Set up git for me in this repo (github.com/akshathkumar219/TechBrats):
+
+git config user.name "<YOUR NAME>"
+git config user.email "<YOUR GITHUB EMAIL>"
+
+Then get me onto a fresh branch off the latest main:
+
+git checkout main
+git pull origin main
+git checkout -b <YOURNAME>/<TASK-ID>-<two words>
+
+Show me `git status` and `git branch --show-current` when you are done.
+Do not run any other git command.
+```
+
+Branch name is lowercase, e.g. `harleen/T03-graph-seam`, `shourya/T02-ingest`.
+It's printed next to every step in this file — use that one, don't invent one.
+
+### Message 2 — scope it to one step
 
 ```
 Read docs/CASE_MODEL.md in full, then docs/tasks/<YOURNAME>.md, then find
@@ -54,8 +80,55 @@ Confirm you have read all three, tell me in one line what you understand the
 task to be, and wait. Do not start until I say GO.
 ```
 
-Then paste the PREAMBLE from §1 followed by your step's prompt. One step per
-session — start a fresh session for the next one.
+It answers. If what it says back is wrong, correct it in plain English before
+you let it start — that costs ten seconds and saves an hour.
+
+### Message 3 — the preamble, then the step
+
+Paste §1 of this file, then the step's own prompt underneath it, then `GO`.
+
+The preamble is not optional and not a formality. It is where the agent learns
+which paths you own, the six laws, the permission boundary, and that it does not
+commit until you say so. Skip it and it will guess, confidently, on all four.
+
+### Message 4 — ship it
+
+Only after **you** have checked it: `make dev`, click the thing, confirm it does
+what the step said.
+
+```
+git status
+
+Show me that output and stop. Do not add anything yet.
+```
+
+Look at the list. One question: **is every file in it mine?** If something
+isn't, say *"that file isn't mine, don't add it"* and it will drop it.
+
+Then:
+
+```
+SHIP IT
+
+git add <the paths I own>
+git commit -m "<the commit message printed under the step>"
+git push -u origin <my branch>
+gh pr create --fill
+```
+
+Then post `<TASK-ID> PR up` in the group chat and **start your next task
+immediately** — a fresh session, message 1 again. Don't sit waiting for the
+merge.
+
+### If something goes wrong
+
+Talk to it in plain English — it knows the commands. *"You're on main, get off
+it."* *"That PR has a conflict, pull main into my branch first."* *"Undo the
+last commit but keep my changes."*
+
+Two it must never do, no matter what it suggests: `git reset --hard` and
+`git checkout .` Both silently delete uncommitted work. If it proposes either,
+say no and tell Akshath.
 
 ---
 
