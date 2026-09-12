@@ -165,7 +165,7 @@ Tick as you go. Four are already on `main`.
 **Block 4 · W6–10** ✅ AKS-T05 ✅ HER-T03 ✅ HAR-T04 ✅ MEH-T03 ✅ AKT-T03 ✅ SHO-T03
 **Block 5 · W10–11** ✅ AKS-T06 ✅ SHO-T04 ✅ HER-T04 ✅ HAR-T05 ✅ [verify by hand]
 **Block 6 · W11–13** ✅ MEH-T04 ✅ AKT-T04 ✅ HAR-T06 ✅ HER-T05
-**Block 7 · W13–16** ☐ MEH-T05 ☐ SHO-T05 ☐ AKS-T07 ☐ HAR-T07 ☐ AKT-T05 ☐ HER-T06
+**Block 7 · W13–16** ✅ MEH-T05 ✅ SHO-T05 ✅ AKS-T07 ✅ HAR-T07 ✅ AKT-T05 ✅ HER-T06
 
 Task IDs keep their original prefixes — they're in the commit messages and in
 `docs/tasks/*.md`, so leaving them alone keeps the history greppable.
