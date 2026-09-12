@@ -24,6 +24,10 @@ export interface AnalysisResult {
   }>
   dropped_proposals_count?: number
   analyzed_at?: string
+  /** True when the backend served this from its 07_AI_Synthesis fixture rather
+   * than a live model run. Must always be surfaced to the user — never shown
+   * as if it were a live result. */
+  cache_used?: boolean
 }
 
 export interface AnalyseButtonProps {
@@ -82,6 +86,24 @@ const CSS = `
   color: var(--ok);
 }
 
+.btn-analyse-ribbon-btn.is-error {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.btn-analyse-status-glyph {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.btn-analyse-status-ok {
+  color: var(--ok);
+}
+
+.btn-analyse-status-error {
+  color: var(--danger);
+}
+
 .btn-analyse-ribbon-container .analyse-pipeline-tooltip {
   top: 50%;
   transform: translateY(-50%);
@@ -130,6 +152,12 @@ const CSS = `
   background-color: rgba(22, 163, 74, 0.12);
   color: var(--ok);
   border-color: var(--ok);
+}
+
+.btn-analyse.is-error {
+  background-color: var(--danger-bg);
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 .btn-analyse-spinner {
@@ -222,6 +250,8 @@ export function AnalyseButton({
   const [isRunning, setIsRunning] = useState(false)
   const [agentIndex, setAgentIndex] = useState(0)
   const [successCount, setSuccessCount] = useState<number | null>(null)
+  const [cacheUsed, setCacheUsed] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showTooltip, setShowTooltip] = useState(false)
   const [showHoverTip, setShowHoverTip] = useState(false)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -256,6 +286,8 @@ export function AnalyseButton({
     const targetCaseId = caseId || vaultName || 'Case_01_Sonipat_Arms'
     setIsRunning(true)
     setSuccessCount(null)
+    setCacheUsed(false)
+    setErrorMessage(null)
     setAgentIndex(0)
     setShowTooltip(true)
 
@@ -298,76 +330,40 @@ export function AnalyseButton({
       window.clearInterval(stepInterval)
 
       let data: AnalysisResult | null = null
+      let parseError: string | null = null
       if (res && res.ok) {
         try {
           data = await res.json()
         } catch {
-          data = null
+          parseError = 'Backend returned an unreadable response.'
         }
-      }
-
-      // Default mock result fallback if backend is offline
-      if (!data) {
-        data = {
-          case_id: targetCaseId,
-          summary: 'Cross-referenced FIR 0142, CDRs, and Tower Dump records. 4 high-confidence proposals generated with verifiable locators under Law 3.',
-          new_connections: [
-            {
-              id: 'prop_0001',
-              claim: 'Vikram Singh coordinated arms consignment with Rehan Khan',
-              reason: '14 calls logged across 72 hours preceding Kharkhoda arms seizure between suspect phone and logistics coordinator',
-              citation: {
-                source_doc_id: 'DOC_CDR_9812345678',
-                locator: 'row:48219',
-                snippet: '9812345678 -> 9896011223 | 2026-02-12 21:14:02 | dur: 184s | cell: HR-SNP-0147',
-              },
-              confidence: 0.94,
-              status: 'proposed',
-            },
-            {
-              id: 'prop_0002',
-              claim: 'Rehan Khan co-located with Amit Malik at Sonipat Toll Plaza',
-              reason: 'Simultaneous cell tower registration on Sector 14 cell HR-SNP-0147 within 4-minute window during transit',
-              citation: {
-                source_doc_id: 'DOC_TD_HR_SNP_0147',
-                locator: 'row:1204',
-                snippet: 'HR-SNP-0147 | 2026-02-12 21:18:30 | 9896011223 & 9812099881 concurrent',
-              },
-              confidence: 0.91,
-              status: 'proposed',
-            },
-            {
-              id: 'prop_0003',
-              claim: 'Amit Malik linked to Balwinder Singh via vehicle HR-26-AB-1234',
-              reason: 'White Mahindra Scorpio registered to Balwinder sighted at Amit Malik hideout during surveillance',
-              citation: {
-                source_doc_id: 'DOC_FL_004',
-                locator: 'p:1 l:18',
-                snippet: 'White Mahindra Scorpio HR-26-AB-1234 parked outside warehouse, Malik present',
-              },
-              confidence: 0.86,
-              status: 'proposed',
-            },
-            {
-              id: 'prop_0004',
-              claim: "Gurpreet 'Guri' Sandhu shared handset IMEI 869123456789012 with Vikram Singh",
-              reason: 'Consecutive IMSI activation on handset IMEI 869123456789012 within 14-day window',
-              citation: {
-                source_doc_id: 'DOC_CDR_9812345678',
-                locator: 'row:51204',
-                snippet: 'IMEI 869123456789012 swap from IMSI 4044501... to 4044509... active Feb 1-14',
-              },
-              confidence: 0.89,
-              status: 'proposed',
-            },
-          ],
-        }
+      } else if (res) {
+        parseError = `Analysis request failed (${res.status}).`
+      } else {
+        parseError = 'Could not reach the backend.'
       }
 
       if (!isMountedRef.current) return
 
-      const proposalsCount = data.new_connections?.length ?? 4
+      // Honesty over uptime: never invent proposals. If the live call failed,
+      // show a real error state — the backend's own cached-fixture fallback
+      // (marked `cache_used`) is the only acceptable substitute for a live run,
+      // and it is always labelled as such downstream. See docs/OVERHAUL_SPEC.md §F.
+      if (!data) {
+        setErrorMessage(parseError ?? 'Analysis failed.')
+        setIsRunning(false)
+        activeTimerRef.current = window.setTimeout(() => {
+          if (isMountedRef.current) {
+            setErrorMessage(null)
+            setShowTooltip(false)
+          }
+        }, 5000)
+        return
+      }
+
+      const proposalsCount = data.new_connections?.length ?? 0
       setSuccessCount(proposalsCount)
+      setCacheUsed(Boolean(data.cache_used))
       setIsRunning(false)
       onAnalysisComplete?.(data)
 
@@ -387,6 +383,7 @@ export function AnalyseButton({
       console.error('[AnalyseCase] Error during analysis:', err)
       window.clearInterval(stepInterval)
       if (isMountedRef.current) {
+        setErrorMessage('Analysis failed.')
         setIsRunning(false)
         setShowTooltip(false)
       }
@@ -405,7 +402,7 @@ export function AnalyseButton({
         <style>{CSS}</style>
         <button
           type="button"
-          className={`ws-ico btn-analyse-ribbon-btn ${isRunning ? 'is-running' : ''} ${successCount !== null ? 'is-complete' : ''}`}
+          className={`ws-ico btn-analyse-ribbon-btn ${isRunning ? 'is-running' : ''} ${successCount !== null ? 'is-complete' : ''} ${errorMessage ? 'is-error' : ''}`}
           onClick={handleAnalyse}
           disabled={isRunning}
           aria-label="Make AI Synthesis"
@@ -414,8 +411,10 @@ export function AnalyseButton({
         >
           {isRunning ? (
             <span className="btn-analyse-agent-pulse" aria-hidden="true" />
+          ) : errorMessage ? (
+            <span aria-hidden="true" className="btn-analyse-status-glyph btn-analyse-status-error">!</span>
           ) : successCount !== null ? (
-            <span aria-hidden="true" style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--ok)' }}>✓</span>
+            <span aria-hidden="true" className="btn-analyse-status-glyph btn-analyse-status-ok">✓</span>
           ) : (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -428,7 +427,13 @@ export function AnalyseButton({
         {/* Ribbon hover tooltip when idle */}
         {showHoverTip && !isRunning && (
           <div className="ws-tooltip" role="tooltip">
-            <span>{successCount !== null ? `Analysis Complete (${successCount} proposals)` : 'Make AI Synthesis'}</span>
+            <span>
+              {errorMessage
+                ? errorMessage
+                : successCount !== null
+                  ? `Analysis Complete (${successCount} proposals)${cacheUsed ? ' · Cached, not live' : ''}`
+                  : 'Make AI Synthesis'}
+            </span>
           </div>
         )}
 
@@ -462,13 +467,15 @@ export function AnalyseButton({
       <style>{CSS}</style>
       <button
         type="button"
-        className={`btn-analyse ${isRunning ? 'is-running' : ''} ${successCount !== null ? 'is-complete' : ''}`}
+        className={`btn-analyse ${isRunning ? 'is-running' : ''} ${successCount !== null ? 'is-complete' : ''} ${errorMessage ? 'is-error' : ''}`}
         onClick={handleAnalyse}
         disabled={isRunning}
         title={
           isRunning
             ? `Active Agent: ${activeAgent.label}`
-            : 'Run AI investigative agent layer over case notes and raw inputs (Law 2: Proposals only)'
+            : errorMessage
+              ? `${errorMessage} Click to retry.`
+              : 'Run AI investigative agent layer over case notes and raw inputs (Law 2: Proposals only)'
         }
         aria-busy={isRunning}
         aria-live="polite"
@@ -478,10 +485,15 @@ export function AnalyseButton({
             <span className="btn-analyse-agent-pulse" aria-hidden="true" />
             <span>{activeAgent.label}...</span>
           </>
+        ) : errorMessage ? (
+          <>
+            <span aria-hidden="true">!</span>
+            <span>Analysis Failed — Retry</span>
+          </>
         ) : successCount !== null ? (
           <>
             <span aria-hidden="true">✓</span>
-            <span>Analysis Complete ({successCount} proposals)</span>
+            <span>Analysis Complete ({successCount} proposals){cacheUsed ? ' · Cached' : ''}</span>
           </>
         ) : (
           <>

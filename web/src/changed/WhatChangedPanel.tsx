@@ -6,13 +6,10 @@ import type {
   WhatChangedCategory,
   WhatChangedNavigationTarget,
 } from './types'
-import {
-  DEFAULT_WHAT_CHANGED_DIFF,
-  buildDiffFromAnalysis,
-} from './types'
+import { buildDiffFromAnalysis, emptyWhatChangedDiff } from './types'
 import type { AnalysisResult } from '../proposals/types'
 import { CitationChip } from '../proposals'
-import { EmptyState, LoadingSkeleton } from '../states'
+import { EmptyState, LoadingSkeleton, ErrorState } from '../states'
 import './changed.css'
 
 type FilterMode = 'all' | WhatChangedCategory
@@ -30,15 +27,18 @@ export function WhatChangedPanel({
   onRefresh,
   className = '',
 }: WhatChangedPanelProps) {
-  // Diff state: derived from props, live events, or backend responses
+  // Diff state: derived from props, live events, or backend responses. With
+  // neither prop supplied, show a real empty diff — never a fabricated
+  // fixture presented as if it were a live result (docs/OVERHAUL_SPEC.md §F).
   const [internalDiff, setInternalDiff] = useState<WhatChangedDiff>(() => {
     if (diffData) return diffData
     if (analysisResult) return buildDiffFromAnalysis(analysisResult, caseId)
-    return { ...DEFAULT_WHAT_CHANGED_DIFF, caseId }
+    return emptyWhatChangedDiff(caseId)
   })
 
   const [activeFilter, setActiveFilter] = useState<FilterMode>('all')
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
 
   const [prevDiffData, setPrevDiffData] = useState<WhatChangedDiff | null | undefined>(diffData)
   const [prevAnalysisResult, setPrevAnalysisResult] = useState<AnalysisResult | null | undefined>(analysisResult)
@@ -85,6 +85,7 @@ export function WhatChangedPanel({
   // Re-run analysis or refresh diff
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
+    setRefreshError(null)
     try {
       if (onRefresh) {
         await onRefresh()
@@ -102,13 +103,12 @@ export function WhatChangedPanel({
           const data: AnalysisResult = await res.json()
           setInternalDiff(buildDiffFromAnalysis(data, caseId))
         } else {
-          console.warn('[WhatChangedPanel] /api/case/analyse non-200, using default diff')
-          setInternalDiff({ ...DEFAULT_WHAT_CHANGED_DIFF, caseId })
+          setRefreshError(`Analysis request failed (${res.status}).`)
         }
       }
     } catch (err) {
-      console.warn('[WhatChangedPanel] Error refreshing diff, using fallback:', err)
-      setInternalDiff({ ...DEFAULT_WHAT_CHANGED_DIFF, caseId })
+      console.warn('[WhatChangedPanel] Error refreshing diff:', err)
+      setRefreshError('Could not reach the backend.')
     } finally {
       setIsRefreshing(false)
     }
@@ -481,6 +481,8 @@ export function WhatChangedPanel({
             <LoadingSkeleton variant="card" />
             <LoadingSkeleton variant="card" />
           </div>
+        ) : refreshError ? (
+          <ErrorState message={refreshError} retryAction={handleRefresh} />
         ) : totalVisibleCount === 0 ? (
           <EmptyState
             headline="No Changes in Selected Filter"

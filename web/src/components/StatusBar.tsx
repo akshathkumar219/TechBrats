@@ -12,31 +12,41 @@ interface StatusBarProps {
   edgeCount?: number
 }
 
+// noteCount/linkCount are intentionally optional with no numeric default —
+// this bar is a trust surface (docs/design-system.md §3); it renders "—"
+// rather than a plausible-looking invented count when data isn't available yet.
+
 interface IntegrityData {
-  status: 'verified' | 'contaminated'
+  status: 'verified' | 'contaminated' | 'unknown'
   failures: string[]
-  document_count: number
+  document_count: number | null
+}
+
+const INTEGRITY_UNKNOWN: IntegrityData = {
+  status: 'unknown',
+  failures: [],
+  document_count: null,
 }
 
 export function StatusBar({
   caseName = 'Case_01_Sonipat_Arms',
   filePath,
   wordCount = 0,
-  noteCount = 42,
-  linkCount = 36,
+  noteCount,
+  linkCount,
   saveStatus = 'saved',
   activeView = 'editor',
   nodeCount,
   edgeCount,
 }: StatusBarProps) {
-  const [integrity, setIntegrity] = useState<IntegrityData>({
-    status: 'verified',
-    failures: [],
-    document_count: 8,
-  })
+  // The status bar is a trust surface (docs/design-system.md §3) — it must show
+  // an honest "unknown" state while unverified, never a plausible-looking number
+  // that didn't come from the backend.
+  const [integrity, setIntegrity] = useState<IntegrityData>(INTEGRITY_UNKNOWN)
 
   useEffect(() => {
     let isMounted = true
+    setIntegrity(INTEGRITY_UNKNOWN)
     fetch('http://127.0.0.1:8000/api/case/integrity')
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -46,19 +56,15 @@ export function StatusBar({
         if (isMounted) setIntegrity(data)
       })
       .catch(() => {
-        // Mock fallback if server is offline
-        if (isMounted) {
-          setIntegrity({
-            status: 'verified',
-            failures: [],
-            document_count: 8,
-          })
-        }
+        if (isMounted) setIntegrity(INTEGRITY_UNKNOWN)
       })
     return () => {
       isMounted = false
     }
   }, [caseName])
+
+  const noteDisplay = activeView === 'graph' ? nodeCount : noteCount ?? integrity.document_count ?? undefined
+  const linkDisplay = activeView === 'graph' ? edgeCount : linkCount
 
   return (
     <footer className="status">
@@ -72,41 +78,28 @@ export function StatusBar({
 
         <div className="status-item status-integrity-item">
           <span
-            className={`status-indicator ${
-              integrity.status === 'verified' ? 'status-verified' : 'status-danger'
-            }`}
-            style={{
-              backgroundColor:
-                integrity.status === 'verified' ? 'var(--ok)' : 'var(--danger)',
-            }}
+            className={`status-indicator status-${integrity.status}`}
           />
           <span>
             {integrity.status === 'verified'
               ? 'Evidence verified'
-              : `⚠ ${integrity.failures.length || 1} modified`}
+              : integrity.status === 'contaminated'
+                ? `⚠ ${integrity.failures.length || 1} modified`
+                : 'Integrity unknown'}
           </span>
         </div>
 
         <span className="status-sep">·</span>
 
         <div className="status-item">
-          <span>{activeView === 'graph' ? `${nodeCount ?? noteCount} nodes` : `${noteCount || integrity.document_count} documents`}</span>
+          <span>{noteDisplay != null ? `${noteDisplay} ${activeView === 'graph' ? 'nodes' : 'documents'}` : '—'}</span>
         </div>
 
         <span className="status-sep">·</span>
 
         <div className="status-item">
-          <span>{activeView === 'graph' ? `${edgeCount ?? linkCount} links` : `${linkCount} links`}</span>
+          <span>{linkDisplay != null ? `${linkDisplay} links` : '—'}</span>
         </div>
-
-        {activeView === 'graph' && (
-          <>
-            <span className="status-sep">·</span>
-            <div className="status-item">
-              <span style={{ color: 'var(--color-amber, #f59e0b)' }}>14 unresolved leads</span>
-            </div>
-          </>
-        )}
       </div>
 
       <div className="status-right">
@@ -117,8 +110,8 @@ export function StatusBar({
             </div>
             <span className="status-sep">·</span>
             <div className="status-item">
-              <span className="status-indicator" style={{ backgroundColor: 'var(--ok)' }} />
-              <span>Cytoscape Ready</span>
+              <span className="status-indicator status-ok" />
+              <span>Graph Ready</span>
             </div>
           </>
         ) : (

@@ -893,8 +893,8 @@ function formatCaseDisplayName(id: string | null): string {
             filePath={path}
             wordCount={p.wordCount}
             saveStatus={p.saveStatus}
-            noteCount={p.files.filter((f) => f.path.endsWith('.md')).length || 0}
-            linkCount={graphData?.edges?.length ?? 36}
+            noteCount={p.files.filter((f) => f.path.endsWith('.md')).length}
+            linkCount={graphData?.edges?.length}
             activeView={activeView}
             nodeCount={graphData?.nodes?.length}
             edgeCount={graphData?.edges?.length}

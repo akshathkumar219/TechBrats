@@ -620,6 +620,8 @@ def analyse_case(
     index_slices = load_case_index_slices(case_dir)
 
     cached_result = load_cached_analysis_result(case_dir)
+    if cached_result is not None:
+        cached_result.cache_used = True
     if _prefer_cache_flag() and cached_result is not None:
         logger.info("SYNDICATEBRAIN_PREFER_CACHE=1 set; serving cached analysis_result.json.")
         return cached_result
@@ -632,8 +634,13 @@ def analyse_case(
 
     try:
         res = run_fan_out_analysis(case_dir, index_slices, llm_client=llm_client)
-        if (len(res.new_connections) < 5 or res.dropped_proposals_count < 1) and cached_result is not None:
-            logger.info("Live analysis yielded insufficient proposals; using cached analysis_result.json.")
+        # Only fall back to the cached fixture when the live run genuinely found
+        # nothing — a live run that returned fewer proposals than the fixture, or
+        # one where the validator simply had nothing to drop, is still a real
+        # result and must not be silently swapped for canned data (see
+        # docs/OVERHAUL_SPEC.md §C1).
+        if len(res.new_connections) == 0 and cached_result is not None:
+            logger.info("Live analysis yielded zero proposals; using cached analysis_result.json.")
             return cached_result
         return res
     except Exception as e:

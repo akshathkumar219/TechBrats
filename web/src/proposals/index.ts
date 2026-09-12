@@ -6,7 +6,6 @@
 export { ProposalPanel } from './ProposalPanel'
 export { ProposalCard } from './ProposalCard'
 export { CitationChip } from './CitationChip'
-export { DEFAULT_MOCK_ANALYSIS_RESULT } from './mockData'
 
 export type {
   Citation,

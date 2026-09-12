@@ -620,12 +620,18 @@ pre, code {
   background-color: var(--accent);
 }
 
-.status-indicator.status-verified {
+.status-indicator.status-verified,
+.status-indicator.status-ok {
   background-color: var(--ok);
 }
 
-.status-indicator.status-danger {
+.status-indicator.status-danger,
+.status-indicator.status-contaminated {
   background-color: var(--danger);
+}
+
+.status-indicator.status-unknown {
+  background-color: var(--text-faint);
 }
 
 .backlink-section {

@@ -8,10 +8,15 @@ import type {
 } from './types'
 import { ProposalCard } from './ProposalCard'
 import { CitationChip } from './CitationChip'
-import { DEFAULT_MOCK_ANALYSIS_RESULT } from './mockData'
-import { EmptyState, LoadingSkeleton } from '../states'
+import { EmptyState, LoadingSkeleton, ErrorState } from '../states'
 import { openFileAt } from '../workspace/navigation'
 import './proposals.css'
+
+const EMPTY_ANALYSIS_RESULT: AnalysisResult = {
+  case_id: '',
+  summary: '',
+  new_connections: [],
+}
 
 export function ProposalPanel({
   analysisResult,
@@ -26,11 +31,13 @@ export function ProposalPanel({
   className = '',
 }: ProposalPanelProps) {
   const [prevAnalysisResult, setPrevAnalysisResult] = useState<AnalysisResult | null | undefined>(analysisResult)
+  // Never fabricate proposals: with no real analysis yet, show the empty state,
+  // not a canned fixture that reads as a live result (docs/OVERHAUL_SPEC.md §F).
   const [internalResult, setInternalResult] = useState<AnalysisResult>(() => {
-    return analysisResult || DEFAULT_MOCK_ANALYSIS_RESULT
+    return analysisResult || EMPTY_ANALYSIS_RESULT
   })
   const [proposals, setProposals] = useState<Proposal[]>(() => {
-    return analysisResult?.new_connections || DEFAULT_MOCK_ANALYSIS_RESULT.new_connections || []
+    return analysisResult?.new_connections || []
   })
   const [activeTab, setActiveTab] = useState<'pending' | 'accepted' | 'all'>('pending')
   const [isFetching, setIsFetching] = useState(false)
@@ -64,9 +71,12 @@ export function ProposalPanel({
     }
   }, [])
 
+  const [fetchError, setFetchError] = useState<string | null>(null)
+
   // Allow fetching directly from POST /api/case/analyse
   const fetchAnalysis = useCallback(async () => {
     setIsFetching(true)
+    setFetchError(null)
     try {
       const res = await fetch('/api/case/analyse', {
         method: 'POST',
@@ -80,19 +90,14 @@ export function ProposalPanel({
       if (res.ok) {
         const data: AnalysisResult = await res.json()
         setInternalResult(data)
-        if (data.new_connections) {
-          setProposals(data.new_connections)
-        }
+        setProposals(data.new_connections || [])
         onRefresh?.()
       } else {
-        console.warn('[ProposalPanel] /api/case/analyse returned non-200, using mock fallback')
-        setInternalResult(DEFAULT_MOCK_ANALYSIS_RESULT)
-        setProposals(DEFAULT_MOCK_ANALYSIS_RESULT.new_connections || [])
+        setFetchError(`Analysis request failed (${res.status}).`)
       }
     } catch (err) {
-      console.warn('[ProposalPanel] Error fetching analysis, falling back to mock:', err)
-      setInternalResult(DEFAULT_MOCK_ANALYSIS_RESULT)
-      setProposals(DEFAULT_MOCK_ANALYSIS_RESULT.new_connections || [])
+      console.warn('[ProposalPanel] Error fetching analysis:', err)
+      setFetchError('Could not reach the backend.')
     } finally {
       setIsFetching(false)
     }
@@ -249,6 +254,11 @@ export function ProposalPanel({
           <div className="proposal-panel-title-group">
             <h2 className="proposal-panel-title">AI Proposals & Review</h2>
             <span className="proposal-case-tag">{internalResult.case_id || caseId}</span>
+            {internalResult.cache_used && (
+              <span className="proposal-cache-tag" title="Served from a precomputed fixture, not a live model run">
+                Cached, not live
+              </span>
+            )}
           </div>
 
           <button
@@ -339,6 +349,8 @@ export function ProposalPanel({
             <LoadingSkeleton variant="card" />
             <LoadingSkeleton variant="card" />
           </div>
+        ) : fetchError ? (
+          <ErrorState message={fetchError} retryAction={fetchAnalysis} />
         ) : proposals.length === 0 ? (
           <EmptyState
             headline="No proposals generated"

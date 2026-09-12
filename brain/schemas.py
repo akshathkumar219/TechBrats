@@ -121,6 +121,11 @@ class AnalysisResult(BaseModel):
     files_to_update: list[FileUpdateProposal] = Field(default_factory=list)
     dropped_proposals_count: int = 0
     analyzed_at: Optional[str] = None
+    cache_used: bool = False
+    """True when this result was served from the 07_AI_Synthesis fixture rather
+    than a live model run (SYNDICATEBRAIN_PREFER_CACHE=1, or a live-run fallback
+    after the model produced too few/no proposals). The frontend must show this
+    to the user — never present a cached result as a live one."""
 
 
 class Entity(BaseModel):

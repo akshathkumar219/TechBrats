@@ -42,6 +42,8 @@ export interface AnalysisResult {
   files_to_update?: FileUpdateProposal[]
   dropped_proposals_count?: number
   analyzed_at?: string | null
+  /** True when served from the backend's 07_AI_Synthesis fixture, not a live run. */
+  cache_used?: boolean
 }
 
 export interface CitationChipProps {

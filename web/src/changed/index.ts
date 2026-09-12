@@ -4,7 +4,7 @@
  */
 
 export { WhatChangedPanel } from './WhatChangedPanel'
-export { DEFAULT_WHAT_CHANGED_DIFF, buildDiffFromAnalysis } from './types'
+export { buildDiffFromAnalysis, emptyWhatChangedDiff } from './types'
 
 export type {
   WhatChangedCategory,
