@@ -1,0 +1,582 @@
+/* states.css — SyndicateBrain shared UI states (EmptyState, LoadingSkeleton, ErrorState)
+ * 100% token CSS variables from web/src/index.css
+ * STRICTLY ZERO HEX CODES
+ */
+
+/* ==========================================================================
+   Animations
+   ========================================================================== */
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ==========================================================================
+   Shared Base Shimmer Block
+   ========================================================================== */
+
+.sb-skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-raised) 0%,
+    var(--bg-overlay) 50%,
+    var(--bg-raised) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+  border-radius: var(--r-sm);
+}
+
+/* ==========================================================================
+   1. EmptyState (<EmptyState>)
+   ========================================================================== */
+
+.sb-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--s6) var(--s5);
+  background: var(--bg-base);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  margin: var(--s3);
+  box-sizing: border-box;
+  font-family: var(--font-ui);
+  color: var(--text-body);
+}
+
+.sb-empty-state.is-compact {
+  padding: var(--s4) var(--s3);
+  margin: var(--s2);
+}
+
+/* Icon / Glyph Container */
+.sb-empty-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--s7);
+  height: var(--s7);
+  border-radius: var(--r-md);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  margin-bottom: var(--s4);
+  flex-shrink: 0;
+}
+
+.sb-empty-state.is-compact .sb-empty-icon-wrap {
+  width: var(--s6);
+  height: var(--s6);
+  margin-bottom: var(--s2);
+}
+
+.sb-empty-icon-svg {
+  width: var(--s5);
+  height: var(--s5);
+  stroke-width: 1.75;
+  stroke: currentColor;
+  fill: none;
+}
+
+.sb-empty-state.is-compact .sb-empty-icon-svg {
+  width: var(--s4);
+  height: var(--s4);
+}
+
+/* Headline */
+.sb-empty-headline {
+  margin: 0 0 var(--s2) 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-primary);
+  max-width: 54ch;
+}
+
+.sb-empty-state.is-compact .sb-empty-headline {
+  font-size: var(--fs-base);
+  margin-bottom: var(--s1);
+}
+
+/* Body Text */
+.sb-empty-body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  color: var(--text-muted);
+  max-width: 60ch;
+}
+
+.sb-empty-state.is-compact .sb-empty-body {
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+
+/* Action Area */
+.sb-empty-action {
+  margin-top: var(--s4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+}
+
+.sb-empty-state.is-compact .sb-empty-action {
+  margin-top: var(--s3);
+}
+
+.sb-empty-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s4);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+
+.sb-empty-btn:hover:not(:disabled) {
+  background: var(--bg-overlay);
+  border-color: var(--border-focus);
+}
+
+.sb-empty-btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+
+.sb-empty-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   2. LoadingSkeleton (<LoadingSkeleton>)
+   ========================================================================== */
+
+.sb-skeleton-root {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  font-family: var(--font-ui);
+  width: 100%;
+}
+
+/* Variant: Text Lines */
+.sb-skeleton-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  width: 100%;
+  padding: var(--s2) 0;
+}
+
+.sb-skeleton-line {
+  height: var(--fs-base);
+  border-radius: var(--r-sm);
+}
+
+/* Variant: Card Placeholder */
+.sb-skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s4);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.sb-skeleton-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.sb-skeleton-avatar {
+  width: var(--s6);
+  height: var(--s6);
+  border-radius: var(--r-sm);
+  flex-shrink: 0;
+}
+
+.sb-skeleton-card-titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  flex: 1;
+}
+
+.sb-skeleton-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  margin-top: var(--s1);
+}
+
+/* Variant: Graph Canvas Placeholder */
+.sb-skeleton-graph {
+  display: flex;
+  flex-direction: column;
+  height: 280px;
+  min-height: 200px;
+  background: var(--bg-void);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.sb-skeleton-graph-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s2) var(--s3);
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border);
+  z-index: 2;
+}
+
+.sb-skeleton-graph-canvas {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.sb-skeleton-graph-node {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+}
+
+.sb-skeleton-graph-edge {
+  position: absolute;
+  height: 1.5px;
+  background: var(--border);
+  transform-origin: 0 50%;
+  opacity: 0.7;
+}
+
+.sb-skeleton-graph-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s1) var(--s3);
+  background: var(--bg-inset);
+  border-top: 1px solid var(--border);
+  z-index: 2;
+}
+
+/* Variant: Table Placeholder */
+.sb-skeleton-table {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-base);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.sb-skeleton-table-header {
+  display: grid;
+  grid-template-columns: 2fr 3fr 2fr 1.5fr;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.sb-skeleton-table-row {
+  display: grid;
+  grid-template-columns: 2fr 3fr 2fr 1.5fr;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+
+.sb-skeleton-table-row:last-child {
+  border-bottom: none;
+}
+
+/* Variant: Pill / Badge Placeholder */
+.sb-skeleton-pill {
+  display: inline-flex;
+  align-items: center;
+  height: var(--s5);
+  width: 96px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Variant: Detail / Inspector Placeholder */
+.sb-skeleton-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s4);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.sb-skeleton-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--border);
+}
+
+.sb-skeleton-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.sb-skeleton-detail-label {
+  width: 72px;
+  height: var(--fs-sm);
+}
+
+.sb-skeleton-detail-value {
+  flex: 1;
+  max-width: 180px;
+  height: var(--fs-sm);
+}
+
+.sb-skeleton-detail-block {
+  margin-top: var(--s2);
+  padding: var(--s3);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+/* ==========================================================================
+   3. ErrorState (<ErrorState>)
+   ========================================================================== */
+
+.sb-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: var(--s5);
+  background: var(--bg-raised);
+  border: 1px solid var(--danger);
+  border-left: 4px solid var(--danger);
+  border-radius: var(--r-md);
+  margin: var(--s3);
+  box-sizing: border-box;
+  font-family: var(--font-ui);
+  color: var(--text-body);
+}
+
+.sb-error-state.is-compact {
+  padding: var(--s3);
+  margin: var(--s2);
+}
+
+.sb-error-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-bottom: var(--s2);
+  width: 100%;
+}
+
+.sb-error-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--s6);
+  height: var(--s6);
+  border-radius: var(--r-sm);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  flex-shrink: 0;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sb-error-state.is-compact .sb-error-badge {
+  width: var(--s5);
+  height: var(--s5);
+  font-size: var(--fs-base);
+}
+
+.sb-error-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.sb-error-state.is-compact .sb-error-title {
+  font-size: var(--fs-base);
+}
+
+.sb-error-message {
+  margin: 0 0 var(--s3) 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  color: var(--text-body);
+}
+
+.sb-error-state.is-compact .sb-error-message {
+  font-size: var(--fs-sm);
+  margin-bottom: var(--s2);
+}
+
+/* File indicator */
+.sb-error-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s1) var(--s2);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  margin-bottom: var(--s3);
+  max-width: 100%;
+  word-break: break-all;
+}
+
+.sb-error-file-label {
+  font-weight: 600;
+  color: var(--danger);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sb-error-file-path {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* Technical details section */
+.sb-error-details {
+  width: 100%;
+  margin-bottom: var(--s3);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.sb-error-details-summary {
+  padding: var(--s2) var(--s3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border);
+  transition: color var(--t-fast), background var(--t-fast);
+}
+
+.sb-error-details-summary:hover {
+  color: var(--text-primary);
+  background: var(--bg-overlay);
+}
+
+.sb-error-details-pre {
+  margin: 0;
+  padding: var(--s3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--text-body);
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+  max-height: 180px;
+}
+
+/* Retry Action */
+.sb-error-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.sb-error-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s4);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+
+.sb-error-retry-btn:hover {
+  background: var(--bg-overlay);
+  border-color: var(--border-focus);
+}
+
+.sb-error-retry-btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+
+.sb-error-retry-glyph {
+  font-size: var(--fs-base);
+  line-height: 1;
+}
