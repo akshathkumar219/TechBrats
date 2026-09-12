@@ -117,7 +117,7 @@ export function ObsidianGraphView({
         filePath: n.filePath,
         isUnresolved: Boolean(n.isUnresolved),
         degree: deg,
-        val: Math.max(2.6, Math.min(10.5, 2.4 + Math.sqrt(deg) * 1.6)),
+        val: Math.max(3.0, Math.min(14, 2.6 + Math.sqrt(deg) * 1.8)),
       }
       nById.set(n.id, pNode)
       pNodes.push(pNode)
@@ -228,43 +228,58 @@ export function ObsidianGraphView({
       showAllLabels,
       searchQuery,
     }
-    // Request instant repaint when highlight or display options change
-    if (fgRef.current) {
-      if (typeof fgRef.current.refresh === 'function') {
-        fgRef.current.refresh()
-      } else if (typeof fgRef.current.d3ReheatSimulation === 'function') {
-        fgRef.current.d3ReheatSimulation()
-      }
-    }
   }, [activeFocusId, highlightedNodeIds, highlightedLinks, nodeSizeMult, linkWidthMult, showAllLabels, searchQuery])
 
-  // Node Color Resolver (Cool Obsidian aesthetic matching Image 2)
-  const getNodeColor = useCallback((type: string, isUnresolved?: boolean): string => {
-    if (isUnresolved) return '#64748b' // cool slate
-    const t = String(type || '').toLowerCase()
-    switch (t) {
-      case 'person':
-        return '#4f46e5' // cool slate-indigo
-      case 'phone':
-      case 'identifier':
-      case 'imei':
-        return '#0284c7' // electric sky cyan
-      case 'vehicle':
-        return '#7c3aed' // cool slate-violet
-      case 'location':
-      case 'tower':
-        return '#0d9488' // cool emerald teal
-      case 'organisation':
-      case 'org':
-        return '#1d4ed8' // deep cobalt blue
-      case 'event':
-      case 'fir':
-        return '#be123c' // cool crimson / ruby
-      case 'device':
-        return '#0891b2' // cool dark cyan
-      default:
-        return '#475569' // cool slate / charcoal
+  // Design system tokens resolver (cached on mount)
+  const tokensRef = useRef<Record<string, string>>({
+    person: '#DC2626',
+    phone: '#2563EB',
+    identifier: '#2563EB',
+    imei: '#2563EB',
+    device: '#0D9488',
+    vehicle: '#7C3AED',
+    location: '#16A34A',
+    tower: '#059669',
+    organisation: '#D97706',
+    org: '#D97706',
+    fir: '#4B5563',
+    event: '#EA580C',
+    evidence: '#1D4ED8',
+    danger: '#DC2626',
+    hypothesis: '#9333EA',
+    unresolved: '#94a3b8',
+    default: '#64748b',
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const cs = getComputedStyle(document.documentElement)
+    tokensRef.current = {
+      person: cs.getPropertyValue('--e-person').trim() || '#DC2626',
+      phone: cs.getPropertyValue('--e-phone').trim() || '#2563EB',
+      identifier: cs.getPropertyValue('--e-phone').trim() || '#2563EB',
+      imei: cs.getPropertyValue('--e-phone').trim() || '#2563EB',
+      device: cs.getPropertyValue('--e-device').trim() || '#0D9488',
+      vehicle: cs.getPropertyValue('--e-vehicle').trim() || '#7C3AED',
+      location: cs.getPropertyValue('--e-location').trim() || '#16A34A',
+      tower: cs.getPropertyValue('--e-tower').trim() || '#059669',
+      organisation: cs.getPropertyValue('--e-org').trim() || '#D97706',
+      org: cs.getPropertyValue('--e-org').trim() || '#D97706',
+      fir: cs.getPropertyValue('--e-fir').trim() || '#4B5563',
+      event: cs.getPropertyValue('--e-event').trim() || '#EA580C',
+      evidence: cs.getPropertyValue('--evidence').trim() || '#1D4ED8',
+      danger: cs.getPropertyValue('--danger').trim() || '#DC2626',
+      hypothesis: cs.getPropertyValue('--hypothesis').trim() || '#9333EA',
+      unresolved: '#94a3b8',
+      default: '#64748b',
     }
+  }, [])
+
+  // Node Color Resolver (From Design System tokens only)
+  const getNodeColor = useCallback((type: string, isUnresolved?: boolean): string => {
+    if (isUnresolved) return tokensRef.current.unresolved || '#94a3b8'
+    const t = String(type || '').toLowerCase()
+    return tokensRef.current[t] || tokensRef.current.default || '#64748b'
   }, [])
 
   // Mount ForceGraph instance ONCE
@@ -280,12 +295,14 @@ export function ObsidianGraphView({
       .nodeId('id')
       .linkSource('source')
       .linkTarget('target')
-      .warmupTicks(60)
-      .cooldownTicks(200)
+      .linkCurvature(0.12)
+      .warmupTicks(12)
+      .cooldownTicks(120)
       .d3AlphaDecay(0.02)
       .d3VelocityDecay(0.3)
+      .autoPauseRedraw(false)
 
-    // Radial gravity force keeping disconnected clusters in a unified spherical constellation (Image 2)
+    // Radial gravity force keeping disconnected clusters in a unified spherical constellation
     function radialGravityForce() {
       let nodes: any[] = []
       const force = (alpha: number) => {
@@ -304,6 +321,43 @@ export function ObsidianGraphView({
     }
     fg.d3Force('radialGravity', radialGravityForce())
 
+    // Collision force preventing overlapping nodes
+    function collisionForce() {
+      let nodes: ProcessedNode[] = []
+      const force = () => {
+        for (let i = 0; i < nodes.length; i++) {
+          const nodeA = nodes[i]
+          const rA = (nodeA.val || 4) + 2
+          for (let j = i + 1; j < nodes.length; j++) {
+            const nodeB = nodes[j]
+            const rB = (nodeB.val || 4) + 2
+            const dx = (nodeB.x || 0) - (nodeA.x || 0)
+            const dy = (nodeB.y || 0) - (nodeA.y || 0)
+            const dist = Math.hypot(dx, dy)
+            const minDist = rA + rB
+            if (dist < minDist && dist > 0.001) {
+              const overlap = (minDist - dist) / dist * 0.5
+              const ox = dx * overlap
+              const oy = dy * overlap
+              if (!nodeA.fx) {
+                nodeA.x = (nodeA.x || 0) - ox
+                nodeA.y = (nodeA.y || 0) - oy
+              }
+              if (!nodeB.fx) {
+                nodeB.x = (nodeB.x || 0) + ox
+                nodeB.y = (nodeB.y || 0) + oy
+              }
+            }
+          }
+        }
+      }
+      force.initialize = (_nodes: any[]) => {
+        nodes = _nodes
+      }
+      return force
+    }
+    fg.d3Force('collision', collisionForce())
+
     // Custom Node Canvas Drawing
     fg.nodeCanvasObject((rawNode: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
         const node = rawNode as ProcessedNode
@@ -318,9 +372,10 @@ export function ObsidianGraphView({
         const isTarget = curFocus === node.id
         const isNeighbor = curHighNodes.has(node.id)
         const isDimmed = hasFocus && !isNeighbor
+        const isPinned = node.fx !== undefined
 
         // Screen-scaled radius ensures dots are always crisp, tactile and never subpixel dust
-        const screenR = Math.max(3.2, (node.val || 4) * Math.pow(Math.max(0.15, globalScale), 0.28) * curSizeMult)
+        const screenR = Math.max(3.5, (node.val || 4) * Math.pow(Math.max(0.15, globalScale), 0.28) * curSizeMult)
         const baseR = screenR / Math.max(0.01, globalScale)
         const r = isTarget ? baseR * 1.35 : baseR
 
@@ -329,24 +384,24 @@ export function ObsidianGraphView({
         ctx.arc(node.x || 0, node.y || 0, Math.max(0.5, r), 0, 2 * Math.PI, false)
 
         if (isDimmed) {
-          ctx.fillStyle = 'rgba(148, 163, 184, 0.22)'
+          ctx.fillStyle = 'rgba(148, 163, 184, 0.16)'
           ctx.fill()
         } else if (isTarget) {
-          // Glow and target ring matching Image 3 in Light Theme
-          ctx.shadowColor = 'rgba(239, 68, 68, 0.55)'
+          // Glow and target ring in Light Theme
+          ctx.shadowColor = 'rgba(220, 38, 38, 0.45)'
           ctx.shadowBlur = 14
-          ctx.fillStyle = '#ef4444'
+          ctx.fillStyle = tokensRef.current.danger || '#DC2626'
           ctx.fill()
           ctx.shadowBlur = 0
           ctx.lineWidth = Math.max(1.8 / globalScale, 2.2 / globalScale)
           ctx.strokeStyle = '#ffffff'
           ctx.stroke()
         } else if (isNeighbor) {
-          // Connected neighbor
+          // Connected neighbor keeps its entity type color at full opacity
           ctx.fillStyle = getNodeColor(node.type, node.isUnresolved)
           ctx.fill()
           ctx.lineWidth = Math.max(1.2 / globalScale, 1.6 / globalScale)
-          ctx.strokeStyle = '#f87171'
+          ctx.strokeStyle = tokensRef.current.danger || '#DC2626'
           ctx.stroke()
         } else {
           // Normal Obsidian dot
@@ -354,18 +409,30 @@ export function ObsidianGraphView({
           ctx.fill()
           if (node.degree >= 10) {
             ctx.lineWidth = 1.0 / globalScale
-            ctx.strokeStyle = 'rgba(15, 23, 42, 0.2)'
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.25)'
             ctx.stroke()
           }
         }
 
-        // Draw Label: When targeted, neighbor, global toggle, or zoomed in
-        const shouldShowLabel = isTarget || curShowAll || (isNeighbor && globalScale >= 1.4) || (globalScale >= 2.4 && node.degree > 2)
+        // Dotted ring if pinned
+        if (isPinned && !isDimmed) {
+          ctx.save()
+          ctx.beginPath()
+          ctx.arc(node.x || 0, node.y || 0, r + (3 / globalScale), 0, 2 * Math.PI)
+          ctx.strokeStyle = 'rgba(79, 70, 229, 0.7)'
+          ctx.lineWidth = 1.2 / globalScale
+          ctx.setLineDash([2 / globalScale, 2 / globalScale])
+          ctx.stroke()
+          ctx.restore()
+        }
+
+        // Draw Label: When targeted, neighbor, global toggle, or degree >= 3 at default zoom
+        const shouldShowLabel = isTarget || curShowAll || (isNeighbor && globalScale >= 1.2) || (node.degree >= 3 && globalScale >= 0.75) || (globalScale >= 1.8)
         if (shouldShowLabel && !isDimmed) {
           const label = node.name || node.id
           const screenFontSize = isTarget ? 13 : Math.max(10, Math.min(14, 11 * Math.pow(Math.max(0.2, globalScale), 0.2)))
           const fontSize = screenFontSize / Math.max(0.01, globalScale)
-          ctx.font = `${isTarget ? '600' : '400'} ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
+          ctx.font = `${isTarget ? '600' : '500'} ${fontSize}px "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'top'
 
@@ -375,17 +442,17 @@ export function ObsidianGraphView({
           const posX = node.x || 0
           const posY = (node.y || 0) + r + (4 / globalScale)
 
-          // Light pill background for readability (Obsidian light theme)
-          ctx.fillStyle = isTarget ? 'rgba(255, 255, 255, 0.98)' : 'rgba(248, 250, 252, 0.94)'
+          // Light pill background for readability
+          ctx.fillStyle = isTarget ? 'rgba(255, 255, 255, 0.98)' : 'rgba(248, 250, 252, 0.95)'
           ctx.beginPath()
           ctx.roundRect(posX - textWidth / 2 - padX, posY - padY, textWidth + padX * 2, fontSize + padY * 2, 4 / globalScale)
           ctx.fill()
-          ctx.strokeStyle = isTarget ? 'rgba(239, 68, 68, 0.85)' : 'rgba(203, 213, 225, 0.8)'
+          ctx.strokeStyle = isTarget ? (tokensRef.current.danger || 'rgba(220, 38, 38, 0.85)') : 'rgba(203, 213, 225, 0.85)'
           ctx.lineWidth = (isTarget ? 1.4 : 1.0) / globalScale
           ctx.stroke()
 
           // Text fill
-          ctx.fillStyle = isTarget ? '#0f172a' : '#334155'
+          ctx.fillStyle = isTarget ? '#0f172a' : '#1e293b'
           ctx.fillText(label, posX, posY)
         }
 
@@ -401,8 +468,8 @@ export function ObsidianGraphView({
         ctx.arc(node.x || 0, node.y || 0, r, 0, 2 * Math.PI, false)
         ctx.fill()
       })
-      // Custom Link Canvas Drawing (Red highlight on incident links, subtle gray default)
-      .linkCanvasObjectMode(() => 'after')
+      // Custom Link Canvas Drawing: Curved links, AI dashed, Replace mode to prevent double rendering
+      .linkCanvasObjectMode(() => 'replace')
       .linkCanvasObject((rawLink: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
         const link = rawLink as ProcessedLink
         const source = typeof link.source === 'object' ? (link.source as ProcessedNode) : null
@@ -418,26 +485,41 @@ export function ObsidianGraphView({
         const hasFocus = Boolean(curFocus)
         const isHighlighted = curHighLinks.has(link)
 
+        const sx = source.x!
+        const sy = source.y!
+        const tx = target.x!
+        const ty = target.y!
+        const mx = (sx + tx) / 2
+        const my = (sy + ty) / 2
+        const dx = tx - sx
+        const dy = ty - sy
+        const curvature = 0.12
+        const cx = mx - dy * curvature
+        const cy = my + dx * curvature
+
         ctx.save()
         ctx.beginPath()
-        ctx.moveTo(source.x, source.y!)
-        ctx.lineTo(target.x, target.y!)
+        ctx.moveTo(sx, sy)
+        ctx.quadraticCurveTo(cx, cy, tx, ty)
+
+        if (link.isAi) {
+          ctx.setLineDash([4 / globalScale, 3 / globalScale])
+        }
 
         if (isHighlighted) {
-          // Bright vivid red highlight matching Obsidian Image 3 in Light Theme!
-          ctx.strokeStyle = '#ef4444'
+          ctx.strokeStyle = tokensRef.current.danger || '#DC2626'
           ctx.lineWidth = Math.max(2.4 / globalScale, 2.8 * curWidthMult)
-          ctx.shadowColor = 'rgba(239, 68, 68, 0.45)'
+          ctx.shadowColor = 'rgba(220, 38, 38, 0.45)'
           ctx.shadowBlur = 8
           ctx.stroke()
         } else if (hasFocus) {
-          // Dimmed non-relevant links
-          ctx.strokeStyle = 'rgba(226, 232, 240, 0.28)'
+          ctx.strokeStyle = 'rgba(226, 232, 240, 0.35)'
           ctx.lineWidth = Math.max(0.4 / globalScale, 0.5 * curWidthMult)
           ctx.stroke()
         } else {
-          // Normal Obsidian hairline edge
-          ctx.strokeStyle = link.isAi ? 'rgba(99, 102, 241, 0.35)' : 'rgba(100, 116, 139, 0.22)'
+          ctx.strokeStyle = link.isAi
+            ? (tokensRef.current.hypothesis ? `${tokensRef.current.hypothesis}66` : 'rgba(147, 51, 234, 0.45)')
+            : 'rgba(100, 116, 139, 0.28)'
           ctx.lineWidth = Math.max(0.8 / globalScale, 0.95 * curWidthMult)
           ctx.stroke()
         }
@@ -451,13 +533,22 @@ export function ObsidianGraphView({
           containerRef.current.style.cursor = node ? 'pointer' : 'default'
         }
       })
+      .onNodeDragEnd((rawNode: any) => {
+        const n = rawNode as ProcessedNode
+        n.fx = n.x
+        n.fy = n.y
+      })
       .onNodeClick((rawNode: any) => {
         const n = rawNode as ProcessedNode
         const now = Date.now()
         const last = lastClickRef.current
 
         if (last.id === n.id && now - last.time < 350) {
-          // Double click: open note in editor
+          // Double click: unpin if pinned, open note in editor
+          if (n.fx !== undefined) {
+            n.fx = undefined
+            n.fy = undefined
+          }
           if (onSelectNodeRef.current && n.filePath) {
             onSelectNodeRef.current(n.id, n.filePath)
           }
@@ -483,7 +574,7 @@ export function ObsidianGraphView({
       })
 
     fgRef.current = fg
-    if (typeof window !== 'undefined') {
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
       ;(window as any).__obsidianFg = fg
     }
 
@@ -526,6 +617,9 @@ export function ObsidianGraphView({
     return () => {
       clearTimeout(timer)
       ro.disconnect()
+      if (fgRef.current && typeof (fgRef.current as any)._destructor === 'function') {
+        ;(fgRef.current as any)._destructor()
+      }
       elem.innerHTML = ''
       fgRef.current = null
     }
@@ -589,6 +683,22 @@ export function ObsidianGraphView({
     }
   }, [])
 
+  // Zoom in
+  const handleZoomIn = useCallback(() => {
+    if (fgRef.current) {
+      const cur = fgRef.current.zoom() || 1
+      fgRef.current.zoom(cur * 1.35, 250)
+    }
+  }, [])
+
+  // Zoom out
+  const handleZoomOut = useCallback(() => {
+    if (fgRef.current) {
+      const cur = fgRef.current.zoom() || 1
+      fgRef.current.zoom(cur / 1.35, 250)
+    }
+  }, [])
+
   // Keyboard shortcut: Escape clears selection
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -648,7 +758,31 @@ export function ObsidianGraphView({
         <button
           type="button"
           className="obsidian-graph-tool-btn"
+          title="Zoom In (+)"
+          aria-label="Zoom In"
+          onClick={handleZoomIn}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="obsidian-graph-tool-btn"
+          title="Zoom Out (-)"
+          aria-label="Zoom Out"
+          onClick={handleZoomOut}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="obsidian-graph-tool-btn"
           title="Zoom to Fit"
+          aria-label="Zoom to Fit"
           onClick={handleZoomFit}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -662,6 +796,7 @@ export function ObsidianGraphView({
           type="button"
           className={`obsidian-graph-tool-btn ${isSettingsOpen ? 'is-active' : ''}`}
           title="Graph Settings (Filters, Display, Forces)"
+          aria-label="Graph Settings"
           onClick={() => setIsSettingsOpen((prev) => !prev)}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -669,6 +804,45 @@ export function ObsidianGraphView({
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg>
         </button>
+      </div>
+
+      {/* Bottom Left Entity & Edge Legend */}
+      <div className="obsidian-graph-legend">
+        <div className="obsidian-graph-legend-title">Legend</div>
+        <div className="obsidian-graph-legend-grid">
+          <div className="obsidian-graph-legend-row">
+            <span className="obsidian-graph-legend-dot" style={{ backgroundColor: tokensRef.current.person || '#DC2626' }} />
+            <span>Person</span>
+          </div>
+          <div className="obsidian-graph-legend-row">
+            <span className="obsidian-graph-legend-dot" style={{ backgroundColor: tokensRef.current.phone || '#2563EB' }} />
+            <span>Identifier</span>
+          </div>
+          <div className="obsidian-graph-legend-row">
+            <span className="obsidian-graph-legend-dot" style={{ backgroundColor: tokensRef.current.vehicle || '#7C3AED' }} />
+            <span>Vehicle</span>
+          </div>
+          <div className="obsidian-graph-legend-row">
+            <span className="obsidian-graph-legend-dot" style={{ backgroundColor: tokensRef.current.location || '#16A34A' }} />
+            <span>Location</span>
+          </div>
+          <div className="obsidian-graph-legend-row">
+            <span className="obsidian-graph-legend-dot" style={{ backgroundColor: tokensRef.current.tower || '#059669' }} />
+            <span>Cell Tower</span>
+          </div>
+          <div className="obsidian-graph-legend-row">
+            <span className="obsidian-graph-legend-dot" style={{ backgroundColor: tokensRef.current.event || '#EA580C' }} />
+            <span>Event / FIR</span>
+          </div>
+          <div className="obsidian-graph-legend-row">
+            <span className="obsidian-graph-legend-line" style={{ backgroundColor: 'rgba(100, 116, 139, 0.4)' }} />
+            <span>Record Link</span>
+          </div>
+          <div className="obsidian-graph-legend-row">
+            <span className="obsidian-graph-legend-line" style={{ borderTop: `2px dashed ${tokensRef.current.hypothesis || '#9333EA'}`, height: 0 }} />
+            <span>AI Lead</span>
+          </div>
+        </div>
       </div>
 
       {/* Floating Obsidian Settings Drawer */}

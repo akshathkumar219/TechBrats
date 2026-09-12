@@ -1,7 +1,7 @@
 import { EditorView, keymap, drawSelection, dropCursor, rectangularSelection,
          crosshairCursor, highlightActiveLine, highlightActiveLineGutter,
          highlightSpecialChars, placeholder as cmPlaceholder } from '@codemirror/view'
-import { EditorState, type Extension } from '@codemirror/state'
+import { EditorState, type Extension, Compartment } from '@codemirror/state'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage, markdownKeymap } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
@@ -14,9 +14,16 @@ import { formattingKeymap } from './formatting'
 import { livePreview, livePreviewClickHandler } from './livePreview'
 import type { VaultFile } from '../fs/vault'
 
+export const livePreviewCompartment = new Compartment()
+
+export function getLivePreviewExtension(isSourceMode: boolean): Extension {
+  return isSourceMode ? [] : [livePreview, livePreviewClickHandler]
+}
+
 interface Options {
   getFiles: () => VaultFile[]
   placeholder?: string
+  isSourceMode?: boolean
 }
 
 /**
@@ -31,7 +38,7 @@ interface Options {
  * elsewhere) start with `livePreview` — currently headings only. See
  * docs/obsidian-editor-features.md section C for what's still incremental.
  */
-export function buildExtensions({ getFiles, placeholder }: Options): Extension[] {
+export function buildExtensions({ getFiles, placeholder, isSourceMode }: Options): Extension[] {
   return [
     // ── Markdown language + Lezer incremental parser ──────────────────────
     markdown({
@@ -88,8 +95,7 @@ export function buildExtensions({ getFiles, placeholder }: Options): Extension[]
     // ── Appearance ────────────────────────────────────────────────────────
     editorTheme,
     syntaxTheme,
-    livePreview,
-    livePreviewClickHandler,
+    livePreviewCompartment.of(getLivePreviewExtension(Boolean(isSourceMode))),
     ...(placeholder ? [cmPlaceholder(placeholder)] : []),
   ]
 }

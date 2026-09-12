@@ -104,8 +104,14 @@ export function useVault() {
   }, [reopenCandidate, loadVaultHandle])
 
   const selectFile = useCallback(
-    async (path: string) => {
+    async (path: string | null) => {
       await flushSave()
+      if (!path) {
+        setActiveFile(null)
+        setContent('')
+        setSaveStatus('saved')
+        return
+      }
       const cleanPath = path.replace(/^Case_\d+_[^/]+\//, '')
       if (!cleanPath.includes('.') || folders.includes(cleanPath)) {
         return

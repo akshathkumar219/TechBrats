@@ -132,19 +132,19 @@ export function SettingsModal({ isOpen, onClose, vaultName }: SettingsModalProps
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 'var(--fs-xs)', color: 'var(--text-body)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ color: 'var(--color-green)' }}>✓</span>
+                    <span style={{ color: 'var(--ok)' }}>✓</span>
                     <strong>Law 1: Raw Inputs Are Sacred</strong> — <code>00_Raw_Inputs/</code> write-protected
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ color: 'var(--color-green)' }}>✓</span>
+                    <span style={{ color: 'var(--ok)' }}>✓</span>
                     <strong>Law 2: Proposals Only</strong> — AI edits queued for human detective approval
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ color: 'var(--color-green)' }}>✓</span>
+                    <span style={{ color: 'var(--ok)' }}>✓</span>
                     <strong>Law 3: Every Link Carries Provenance</strong> — Document ID, line & hash verified
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ color: 'var(--color-green)' }}>✓</span>
+                    <span style={{ color: 'var(--ok)' }}>✓</span>
                     <strong>Law 4: Grounding Gate</strong> — Uncited claims automatically discarded
                   </div>
                 </div>
@@ -240,7 +240,7 @@ export function SettingsModal({ isOpen, onClose, vaultName }: SettingsModalProps
         {/* Footer Actions */}
         <div style={{ padding: 'var(--s3) var(--s4)', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--s2)' }}>
           {savedNotice && (
-            <span style={{ color: 'var(--color-green)', fontSize: 'var(--fs-xs)', fontWeight: 500 }}>
+            <span style={{ color: 'var(--ok)', fontSize: 'var(--fs-xs)', fontWeight: 500 }}>
               ✓ Settings saved!
             </span>
           )}

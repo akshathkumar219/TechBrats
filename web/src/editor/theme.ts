@@ -165,6 +165,32 @@ export const editorTheme = EditorView.theme(
       marginBottom: 'var(--s4)',
       cursor: 'pointer',
     },
+    '.cm-list-bullet': {
+      color: 'var(--accent)',
+      marginRight: 'var(--s2)',
+      fontSize: '1.1em',
+      verticalAlign: 'middle',
+    },
+    '.cm-citation-chip': {
+      cursor: 'pointer',
+      verticalAlign: 'baseline',
+      margin: '0 3px',
+    },
+    '.cm-heading-1': {
+      fontSize: 'var(--fs-xl)',
+      fontWeight: '600',
+      color: 'var(--text-primary)',
+    },
+    '.cm-heading-2': {
+      fontSize: 'var(--fs-lg)',
+      fontWeight: '600',
+      color: 'var(--text-primary)',
+    },
+    '.cm-heading-3': {
+      fontSize: 'var(--fs-md)',
+      fontWeight: '600',
+      color: 'var(--text-primary)',
+    },
   },
   { dark: true }
 )

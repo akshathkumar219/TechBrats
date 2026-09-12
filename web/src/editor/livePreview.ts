@@ -31,6 +31,73 @@ class HRWidget extends WidgetType {
   }
 }
 
+class BulletWidget extends WidgetType {
+  toDOM(): HTMLElement {
+    const span = document.createElement('span')
+    span.className = 'cm-list-bullet'
+    span.textContent = '•'
+    return span
+  }
+}
+
+class CitationWidget extends WidgetType {
+  raw: string
+  constructor(raw: string) {
+    super()
+    this.raw = raw
+  }
+
+  eq(other: CitationWidget): boolean {
+    return this.raw === other.raw
+  }
+
+  toDOM(): HTMLElement {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'copilot-citation-chip is-inline cm-citation-chip'
+    btn.title = `Evidence Citation: ${this.raw} — Click to inspect`
+
+    const trimmed = this.raw.trim()
+    const parts = trimmed.split(/\s+/)
+    const source = parts[0] || trimmed
+    const locator = parts.slice(1).join(' ')
+
+    const icon = document.createElement('span')
+    icon.className = 'copilot-citation-icon'
+    icon.textContent = '§'
+    btn.appendChild(icon)
+
+    const sourceEl = document.createElement('span')
+    sourceEl.className = 'copilot-citation-source'
+    sourceEl.textContent = source
+    btn.appendChild(sourceEl)
+
+    if (locator) {
+      const sep = document.createElement('span')
+      sep.className = 'copilot-citation-sep'
+      sep.textContent = '·'
+      btn.appendChild(sep)
+
+      const locEl = document.createElement('span')
+      locEl.className = 'copilot-citation-locator'
+      locEl.textContent = locator
+      btn.appendChild(locEl)
+    }
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      window.dispatchEvent(
+        new CustomEvent('syndicate-brain:open-file', {
+          detail: { path: source },
+        })
+      )
+    })
+
+    return btn
+  }
+}
+
 class CheckboxWidget extends WidgetType {
   checked: boolean
   pos: number
@@ -73,7 +140,7 @@ class FrontmatterWidget extends WidgetType {
     return JSON.stringify(this.properties) === JSON.stringify(other.properties)
   }
 
-  toDOM(view: EditorView): HTMLElement {
+  toDOM(_view: EditorView): HTMLElement {
     const container = document.createElement('div')
     container.className = 'properties-panel cm-frontmatter-widget'
 
@@ -131,10 +198,14 @@ class FrontmatterWidget extends WidgetType {
 
     container.appendChild(table)
 
-    container.addEventListener('click', (e) => {
+    // Collapsible toggle on header click
+    let isExpanded = true
+    header.addEventListener('click', (e) => {
       e.stopPropagation()
-      view.dispatch({ selection: { anchor: 0 }, scrollIntoView: true })
-      view.focus()
+      isExpanded = !isExpanded
+      table.style.display = isExpanded ? 'flex' : 'none'
+      const chevron = title.querySelector('.properties-chevron')
+      if (chevron) chevron.textContent = isExpanded ? '▾' : '▸'
     })
 
     return container
@@ -153,30 +224,20 @@ function buildDecorations(state: EditorState): DecorationSet {
   const activeLines = cursorLines(state)
   const decorations: Range<Decoration>[] = []
   const docText = state.doc.toString()
+  const headingLinesDecorated = new Set<number>()
 
-  // 1. Frontmatter check at start of document
+  // 1. Frontmatter check at start of document — always formatted as Properties panel in Live Preview
   let fmEnd = 0
   const fmMatch = docText.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)
   if (fmMatch) {
     fmEnd = fmMatch[0].length
-    const fmStartLine = state.doc.lineAt(0).number
-    const fmEndLine = state.doc.lineAt(Math.max(0, fmEnd - 1)).number
-    let cursorInFm = false
-    for (let l = fmStartLine; l <= fmEndLine; l++) {
-      if (activeLines.has(l)) {
-        cursorInFm = true
-        break
-      }
-    }
-    if (!cursorInFm) {
-      const { properties } = parseFrontmatter(docText)
-      if (Object.keys(properties).length > 0) {
-        decorations.push(
-          Decoration.replace({
-            widget: new FrontmatterWidget(properties),
-          }).range(0, fmEnd)
-        )
-      }
+    const { properties } = parseFrontmatter(docText)
+    if (Object.keys(properties).length > 0) {
+      decorations.push(
+        Decoration.replace({
+          widget: new FrontmatterWidget(properties),
+        }).range(0, fmEnd)
+      )
     }
   }
 
@@ -186,11 +247,19 @@ function buildDecorations(state: EditorState): DecorationSet {
       // Don't decorate inside frontmatter when it is already replaced
       if (fmEnd > 0 && node.to <= fmEnd) return
 
-      const lineNum = state.doc.lineAt(node.from).number
+      const line = state.doc.lineAt(node.from)
+      const lineNum = line.number
       const isLineActive = activeLines.has(lineNum)
 
-      // ATX Headings: hide `#` mark
+      // ATX Headings: apply line typography and hide `#` mark
       if (HEADING_NODE_RE.test(node.name)) {
+        const level = node.name.slice(-1)
+        if (!headingLinesDecorated.has(lineNum)) {
+          headingLinesDecorated.add(lineNum)
+          decorations.push(
+            Decoration.line({ class: `cm-heading cm-heading-${level}` }).range(line.from)
+          )
+        }
         if (isLineActive) return
         const mark = node.node.firstChild
         if (mark && mark.name === 'HeaderMark') {
@@ -248,9 +317,22 @@ function buildDecorations(state: EditorState): DecorationSet {
         }
       }
 
-      // Links & Wiki-links
+      // Links, Wiki-links & Citations
       else if (node.name === 'Link') {
         if (isLineActive) return
+
+        // Check if this is an evidentiary citation: ^[DOC_... locator]
+        const isCitation = node.from > 0 && state.doc.sliceString(node.from - 1, node.from) === '^'
+        if (isCitation) {
+          const innerText = state.doc.sliceString(node.from + 1, node.to - 1)
+          decorations.push(
+            Decoration.replace({
+              widget: new CitationWidget(innerText),
+            }).range(node.from - 1, node.to)
+          )
+          return
+        }
+
         const isWiki =
           state.doc.sliceString(node.from - 1, node.from) === '[' &&
           state.doc.sliceString(node.to, node.to + 1) === ']'
@@ -287,6 +369,27 @@ function buildDecorations(state: EditorState): DecorationSet {
             decorations.push(Decoration.replace({}).range(openBracket.from, openBracket.to))
             decorations.push(Decoration.mark({ class: 'cm-link-text' }).range(openBracket.to, closeBracket.from))
             decorations.push(Decoration.replace({}).range(closeBracket.from, closeParen.to))
+          }
+        }
+      }
+
+      // List marks (- / * / +)
+      else if (node.name === 'ListMark') {
+        if (isLineActive) return
+        const parent = node.node.parent
+        if (parent?.name === 'ListItem' && parent.getChild('Task')) {
+          // Task list item: hide the leading "- " so only the checkbox renders
+          let hideTo = node.to
+          if (state.doc.sliceString(hideTo, hideTo + 1) === ' ') hideTo += 1
+          decorations.push(Decoration.replace({}).range(node.from, hideTo))
+        } else {
+          const markText = state.doc.sliceString(node.from, node.to)
+          if (markText === '-' || markText === '*' || markText === '+') {
+            decorations.push(
+              Decoration.replace({
+                widget: new BulletWidget(),
+              }).range(node.from, node.to)
+            )
           }
         }
       }
@@ -328,6 +431,7 @@ function buildDecorations(state: EditorState): DecorationSet {
     },
   })
 
+  decorations.sort((a, b) => a.from - b.from)
   return Decoration.set(decorations, true)
 }
 

@@ -13,6 +13,16 @@ export function CopilotMessage({
   const [isRetrievedOpen, setIsRetrievedOpen] = useState(false)
   const isUser = message.role === 'user'
 
+  const validSourceSet = useMemo(() => {
+    const s = new Set<string>(message.notesRetrieved || [])
+    if (message.citations) {
+      for (const c of message.citations) {
+        if (c?.source_doc_id) s.add(c.source_doc_id)
+      }
+    }
+    return s
+  }, [message.notesRetrieved, message.citations])
+
   if (isUser) {
     return (
       <div className="copilot-msg is-user">
@@ -55,15 +65,6 @@ export function CopilotMessage({
   })()
 
   const retrievedNotes = message.notesRetrieved || []
-  const validSourceSet = useMemo(() => {
-    const s = new Set<string>(retrievedNotes)
-    if (message.citations) {
-      for (const c of message.citations) {
-        if (c?.source_doc_id) s.add(c.source_doc_id)
-      }
-    }
-    return s
-  }, [retrievedNotes, message.citations])
 
   return (
     <div className="copilot-msg is-bot">

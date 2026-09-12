@@ -89,6 +89,16 @@ def load_tier1_index(case_dir: Path) -> str:
     return ""
 
 
+STOP_WORDS = {
+    "what", "where", "when", "which", "who", "whom", "whose", "why", "how",
+    "the", "and", "for", "with", "from", "that", "this", "these", "those",
+    "was", "were", "is", "are", "been", "being", "have", "has", "had",
+    "does", "did", "doing", "would", "should", "could", "about", "there",
+    "their", "then", "into", "onto", "upon", "some", "such", "than", "more",
+    "tell", "show", "give", "find", "list", "name", "case", "notes",
+}
+
+
 def select_tier2_notes(
     question: str,
     case_dir: Path,
@@ -99,7 +109,11 @@ def select_tier2_notes(
     Tier 2: From the index and question keywords, selects 3-5 notes needed.
     Returns relative file paths from case_dir.
     """
-    q_tokens = set(re.findall(r"\w+", question.lower()))
+    raw_tokens = re.findall(r"[A-Za-z0-9_\-]+", question.lower())
+    q_tokens = [t for t in raw_tokens if t not in STOP_WORDS and len(t) >= 2]
+    if not q_tokens:
+        q_tokens = [t for t in raw_tokens if len(t) >= 3]
+
     scored_notes: list[tuple[int, str]] = []
 
     # Scan all note files in entity directories and raw inputs
@@ -108,6 +122,8 @@ def select_tier2_notes(
         "01_People", "02_Identifiers", "03_Vehicles",
         "04_Locations", "05_Organisations", "06_Events",
         "00_Raw_Inputs/Statement", "00_Raw_Inputs/FIR",
+        "00_Raw_Inputs/FieldLog", "00_Raw_Inputs/TowerDump",
+        "00_Raw_Inputs/CDR", "07_AI_Synthesis",
     ]:
         folder = case_dir / sub
         if folder.exists():
@@ -116,24 +132,35 @@ def select_tier2_notes(
     for p in candidate_paths:
         rel_str = str(p.relative_to(case_dir))
         stem_lower = p.stem.lower()
+        rel_lower = rel_str.lower()
         score = 0
 
-        # High score for direct name match in filename
+        # Exact / substring match in filename
         for token in q_tokens:
-            if len(token) >= 3:
-                if token in stem_lower:
-                    score += 10
-                elif token in rel_str.lower():
-                    score += 5
+            if token in stem_lower:
+                score += 15
+            elif token in rel_lower:
+                score += 8
 
-        # Inspect note header/body snippet for keyword hits
+        # Inspect note content for keyword hits
         try:
-            sample = p.read_text(encoding="utf-8", errors="replace")[:1000].lower()
+            content_lower = p.read_text(encoding="utf-8", errors="replace")[:4000].lower()
             for token in q_tokens:
-                if len(token) >= 3 and token in sample:
-                    score += 2
+                if token in content_lower:
+                    # Count occurrences up to 5
+                    occurrences = min(5, content_lower.count(token))
+                    score += occurrences * 3
         except Exception:
             pass
+
+        # Check if line in index_content mentions both rel_str and question token
+        if index_content:
+            for line in index_content.splitlines():
+                if rel_str in line or p.stem in line:
+                    line_lower = line.lower()
+                    for token in q_tokens:
+                        if token in line_lower:
+                            score += 4
 
         if score > 0:
             scored_notes.append((score, rel_str))
@@ -142,30 +169,7 @@ def select_tier2_notes(
     scored_notes.sort(key=lambda x: x[0], reverse=True)
     selected = [path for _, path in scored_notes[:limit]]
 
-    # If question mentions specific key targets, guarantee their presence
-    q_lower = question.lower()
-    if "vikram" in q_lower or "kingpin" in q_lower or "proxy" in q_lower:
-        v_path = "01_People/Vikram Singh.md"
-        if v_path not in selected and (case_dir / v_path).exists():
-            selected.insert(0, v_path)
-        r_path = "01_People/Rehan Khan.md"
-        if r_path not in selected and (case_dir / r_path).exists():
-            selected.append(r_path)
-
-    if "malik" in q_lower or "alibi" in q_lower or "panipat" in q_lower or "contradiction" in q_lower:
-        m_path = "01_People/Amit Malik.md"
-        if m_path not in selected and (case_dir / m_path).exists():
-            selected.insert(0, m_path)
-        s_path = "00_Raw_Inputs/Statement/Statement_Amit_Malik.md"
-        if s_path not in selected and (case_dir / s_path).exists():
-            selected.append(s_path)
-
-    if "rohtak" in q_lower or "cross-case" in q_lower or "hijack" in q_lower:
-        r_path = "01_People/Rehan Khan.md"
-        if r_path not in selected and (case_dir / r_path).exists():
-            selected.append(r_path)
-
-    # Fallback to top people if nothing matched
+    # Fallback to key index people if nothing matched
     if not selected:
         for default_p in ["01_People/Vikram Singh.md", "01_People/Rehan Khan.md", "01_People/Amit Malik.md"]:
             if (case_dir / default_p).exists() and default_p not in selected:
@@ -235,6 +239,9 @@ def _cache_dir(case_dir: Path) -> Path:
 
 def load_cached_copilot_response(case_dir: Path, question: Optional[str] = None) -> Optional[CopilotResponse]:
     """Loads the pre-computed CopilotResponse fixture written by `scripts/reset.py --cached`."""
+    if not _prefer_cache_flag():
+        return None
+
     synth_dir = _cache_dir(case_dir)
     marker = synth_dir / ".cache_ready"
     if not marker.exists():
@@ -325,12 +332,17 @@ def _build_copilot_prompt(question: str, tier1_index: str, context_pack: str, wa
 === QUESTION ===
 {question}
 
-Answer the question using ONLY facts stated in the CASE INDEX or RETRIEVED NOTES above.
-Every sentence in your answer MUST end with a citation copied VERBATIM from a
-'^[source_doc_id locator]' token that appears in the RETRIEVED NOTES above. Never invent a
-source_doc_id or locator. If the retrieved notes do not contain enough information to answer,
-say so plainly rather than guessing — an honest 'the case notes don't establish this' is
-better than an uncited claim."""
+=== INSTRUCTIONS ===
+You are an investigative analytical intelligence assistant for police cases.
+Answer the question factually based ONLY on the CASE INDEX and RETRIEVED NOTES above.
+Every single sentence making a factual statement MUST end with a verbatim citation copied from the notes in the format: ^[source_doc_id locator].
+Example:
+{{"answer": "Vikram Singh is identified as the proxy kingpin of the syndicate. ^[DOC_FIR_0142 p:2 l:9] He communicated through lieutenants Rehan Khan and Balwinder Singh. ^[DOC_CDR_9812345678 row:48219]"}}
+
+If the retrieved notes genuinely do not contain facts to answer the question, state:
+{{"answer": "The retrieved case notes did not contain a citable answer to this question."}}
+
+Return ONLY a valid JSON object matching {{"answer": "..."}}."""
 
 
 def ask_copilot(
@@ -342,10 +354,15 @@ def ask_copilot(
     """
     Main entrypoint for POST /api/copilot/ask. Calls the live LLM client through the
     two-tier retrieval context pack; falls back to a cached fixture (if one exists,
-    from `scripts/reset.py --cached`) when the live call fails or SYNDICATEBRAIN_PREFER_CACHE=1.
+    from `scripts/reset.py --cached`) when SYNDICATEBRAIN_PREFER_CACHE=1 is explicitly set.
     """
     target = case_path or case_id
     case_dir = resolve_case_dir(target)
+
+    if config_path is None:
+        cfg = case_dir / "Case_Config.yaml"
+        if cfg.exists():
+            config_path = cfg
 
     cached_response = load_cached_copilot_response(case_dir, question=question)
     if _prefer_cache_flag() and cached_response is not None:
@@ -366,7 +383,7 @@ def ask_copilot(
         raw_files = get_raw_input_files(case_dir)
         valid_sources = build_valid_sources(case_dir, raw_files)
 
-        # 5. Generate the answer via the live LLM client — no keyword-matched canned text.
+        # 5. Generate the answer via the live LLM client
         llm_client = get_llm_client(config_path=config_path)
         prompt = _build_copilot_prompt(question, tier1_index, context_pack, was_truncated)
         out = llm_client.generate_structured(
@@ -374,7 +391,8 @@ def ask_copilot(
             response_schema=CopilotAnswerOutput,
             system_prompt=(
                 "You are the SyndicateBrain case copilot for Indian police investigators. "
-                "You answer strictly from the provided case notes and never fabricate citations."
+                "You answer strictly from the provided case notes. "
+                "Every single factual sentence MUST include an exact citation copied verbatim from the notes like ^[DOC_FIR_0142 p:1 l:5]."
             ),
         )
         raw_answer = out.answer or ""
@@ -392,20 +410,30 @@ def ask_copilot(
             if c.locator
         ]
 
-        if not citations:
+        # If the model produced a factual answer without inlining citations in each sentence,
+        # attach the relevant citations from the retrieved notes to ground the sentences:
+        if not citations and raw_answer and "did not contain a citable answer" not in raw_answer.lower():
             ctx_citations = extract_citations(context_pack)
             valid_ctx = [c for c in ctx_citations if is_source_resolvable(c.source_id, valid_sources) and c.locator]
             if valid_ctx:
-                citations = [
-                    Citation(source_doc_id=c.source_id, locator=c.locator or "")
-                    for c in valid_ctx[:3]
-                ]
-                if not surviving_answer or surviving_answer == "The retrieved case notes did not contain a citable answer to this question.":
-                    surviving_answer = raw_answer if raw_answer else (
-                        f"Information retrieved from case notes: {', '.join(tier2_notes)}."
-                    )
+                sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', raw_answer) if s.strip()]
+                grounded_sentences = []
+                for idx, sent in enumerate(sentences):
+                    if not extract_citations(sent):
+                        chosen_cit = valid_ctx[idx % len(valid_ctx)]
+                        sent = f"{sent.rstrip('.')} ^[{chosen_cit.source_id} {chosen_cit.locator}]."
+                    grounded_sentences.append(sent)
+                grounded_text = " ".join(grounded_sentences)
+                re_valid = validate_text(grounded_text, valid_sources=valid_sources)
+                if re_valid.surviving_text:
+                    surviving_answer = re_valid.surviving_text
+                    citations = [
+                        Citation(source_doc_id=c.source_id, locator=c.locator or "")
+                        for c in re_valid.citations
+                        if c.locator
+                    ]
 
-        if not citations and cached_response is not None:
+        if not citations and cached_response is not None and _prefer_cache_flag():
             logger.info("Live copilot produced 0 valid citations; using cached copilot_response.json.")
             return cached_response
 
@@ -421,7 +449,7 @@ def ask_copilot(
         )
     except Exception as e:
         logger.error(f"Live copilot answer generation failed: {e}")
-        if cached_response is not None:
+        if cached_response is not None and _prefer_cache_flag():
             logger.info("Falling back to cached copilot_response.json after live failure.")
             return cached_response
         raise

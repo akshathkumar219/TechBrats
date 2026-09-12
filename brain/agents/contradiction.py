@@ -28,6 +28,21 @@ LAWS:
 2. Cite the exact source_doc_id and locator of the contradicting physical record, copied verbatim from what you were given (e.g. source_doc_id "DOC_TD_HR_SNP_0147", locator "row:1204").
 3. Provide high confidence when timestamp and cell tower physically rule out stated location.
 4. Output JSON strictly matching the requested schema. Keep the "contradictions" list short (at most 2 items) and only include contradictions you are confident about.
+
+Example Valid JSON Response:
+{
+  "contradictions": [
+    {
+      "claim": "False alibi: suspect claimed to be in Delhi at 22:30",
+      "reason": "Cell tower HR-SNP-0147 ping logged suspect IMEI at Murthal toll at 22:28",
+      "source_doc_id": "DOC_TD_HR_SNP_0147",
+      "locator": "row:1204",
+      "source_entity": "Vikram Singh",
+      "target_entity": "HR-SNP-0147",
+      "confidence": 0.98
+    }
+  ]
+}
 """
 
 
@@ -43,7 +58,7 @@ class ContradictionCandidate(BaseModel):
 
 
 class ContradictionOutput(BaseModel):
-    contradictions: list[ContradictionCandidate] = Field(default_factory=list)
+    contradictions: list[ContradictionCandidate]
 
 
 def build_contradiction_prompt(

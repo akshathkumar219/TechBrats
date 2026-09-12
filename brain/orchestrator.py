@@ -22,6 +22,7 @@ Cache escape hatch (Block 5/7 fixtures): if 07_AI_Synthesis/.cache_ready exists 
 it outright — falls back to the pre-computed analysis_result.json instead of hard-failing.
 """
 
+import concurrent.futures
 from datetime import datetime, timezone
 import difflib
 import json
@@ -64,12 +65,12 @@ logger = logging.getLogger("brain.orchestrator")
 # result (fewer folders analysed) instead of hanging the demo indefinitely.
 MAX_FAN_OUT_SECONDS = float(os.environ.get("SYNDICATEBRAIN_FAN_OUT_BUDGET", "150"))
 
-# Cap on raw evidence / CSV excerpt sizes fed into any single prompt. Small local models
-# (llama3 on CPU) get dramatically slower per extra KB of context, so these are kept tight.
-MAX_EVIDENCE_PACK_CHARS = 2500
-MAX_PHYSICAL_EVIDENCE_CHARS = 2000
-MAX_CSV_ROWS_PER_FILE = 20
-MAX_INDEX_SLICE_CHARS = 1200
+# Cap on raw evidence / CSV excerpt sizes fed into any single prompt. Raised to 10KB
+# to prevent starvation of later evidentiary records.
+MAX_EVIDENCE_PACK_CHARS = 10000
+MAX_PHYSICAL_EVIDENCE_CHARS = 4000
+MAX_CSV_ROWS_PER_FILE = 25
+MAX_INDEX_SLICE_CHARS = 2000
 
 CACHE_SUBDIR = "07_AI_Synthesis"
 
@@ -185,22 +186,28 @@ def _derive_csv_doc_id(f: Path) -> Optional[str]:
     return None
 
 
-def build_valid_sources(case_dir: Path, raw_files: list[Path]) -> set[str]:
+def build_valid_sources(case_dir: Path, raw_files: Optional[list[Path]] = None) -> set[str]:
     """
     Builds the set of resolvable citation source_doc_ids for this case by:
     1. Scanning every markdown note in the vault (raw inputs and entity notes alike)
        for citation tokens already embedded in real text (self-citations).
     2. Deriving ids for CDR / TowerDump CSVs from their filenames, since those files
        carry no embedded citations of their own (they are the physical record).
+    3. Extracting canonical case identifiers (FIR_XXXX, STMT_XXXX, TD_XXXX, CDR_XXXX)
+       directly from file stems.
     Both forms (with and without the DOC_ prefix) are included; validator.py already
     normalizes across that prefix, but keeping both here avoids surprises.
     """
+    if raw_files is None:
+        raw_files = get_raw_input_files(case_dir)
+
     valid_sources: set[str] = set()
 
     for md_path in case_dir.rglob("*.md"):
         try:
             text = md_path.read_text(encoding="utf-8", errors="replace")
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Could not read markdown file {md_path} for citation source indexing: {e}")
             continue
         for m in _CITATION_TOKEN_RE.finditer(text):
             token = m.group(1).strip()
@@ -214,6 +221,14 @@ def build_valid_sources(case_dir: Path, raw_files: list[Path]) -> set[str]:
         valid_sources.add(stem)
         valid_sources.add(f.name)
         valid_sources.add(f"DOC_{stem}")
+
+        # Extract sub-patterns like FIR_0142, STMT_002, TD_HR_SNP_0147, CDR_9812345678
+        for pat in (r"FIR_\d+", r"STMT_\d+", r"FL_\d+", r"TD_[A-Za-z0-9_]+", r"CDR_\d+"):
+            m = re.search(pat, stem)
+            if m:
+                tok = m.group(0)
+                valid_sources.add(tok)
+                valid_sources.add(f"DOC_{tok}")
 
         csv_doc_id = _derive_csv_doc_id(f)
         if csv_doc_id:
@@ -233,7 +248,8 @@ def _extract_known_identifiers(case_dir: Path) -> set[str]:
         for p in folder.glob("*.md"):
             try:
                 text = p.read_text(encoding="utf-8", errors="replace")
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Could not read entity note {p} for identifier extraction: {e}")
                 continue
             known.update(_PHONE_OR_IMEI_RE.findall(text))
     return known
@@ -248,7 +264,8 @@ def _build_evidence_pack(raw_files: list[Path], max_chars: int = MAX_EVIDENCE_PA
             continue
         try:
             text = f.read_text(encoding="utf-8", errors="replace")
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Could not read evidentiary document {f} for evidence pack: {e}")
             continue
         header = f"\n=== DOCUMENT: {f.name} ===\n"
         chunk = header + text
@@ -511,50 +528,68 @@ def run_fan_out_analysis(
     start_time = time.monotonic()
 
     if llm_client is not None:
-        # 1. Connection Finder — fan out across every non-empty per-folder index slice.
-        for folder_name, slice_text in index_slices.items():
-            if not slice_text.strip():
-                continue
-            if time.monotonic() - start_time > MAX_FAN_OUT_SECONDS:
-                logger.warning("Fan-out time budget exceeded; skipping remaining folders.")
-                break
-            try:
+        future_to_meta: dict[concurrent.futures.Future, tuple[str, str]] = {}
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            # 1. Connection Finder — fan out across every non-empty per-folder index slice.
+            for folder_name, slice_text in index_slices.items():
+                if not slice_text.strip():
+                    continue
                 prompt = build_connection_prompt(
                     index_slice=slice_text[:MAX_INDEX_SLICE_CHARS],
                     raw_evidence_summary=evidence_pack,
                     focus_entity=None,
                 )
-                out = llm_client.generate_structured(
+                fut = executor.submit(
+                    llm_client.generate_structured,
                     prompt=prompt,
                     response_schema=ConnectionFinderOutput,
                     system_prompt=CONNECTION_FINDER_SYSTEM_PROMPT,
                 )
-                candidate_raw.extend(out.proposals)
-                logger.info(f"Connection finder ({folder_name}): {len(out.proposals)} proposal(s).")
-            except Exception as e:
-                logger.warning(f"Connection finder failed for folder {folder_name}: {e}")
+                future_to_meta[fut] = ("connection", folder_name)
 
-        # 2. Contradiction Detector — statements vs physical records.
-        statements_text = "\n".join(
-            f.read_text(encoding="utf-8", errors="replace")
-            for f in raw_files
-            if f.parent.name == "Statement" and f.suffix.lower() == ".md"
-        )
-        if statements_text.strip() and physical_evidence_text.strip():
-            try:
+            # 2. Contradiction Detector — statements vs physical records.
+            statements_text = "\n".join(
+                f.read_text(encoding="utf-8", errors="replace")
+                for f in raw_files
+                if f.parent.name == "Statement" and f.suffix.lower() == ".md"
+            )
+            if statements_text.strip() and physical_evidence_text.strip():
                 c_prompt = build_contradiction_prompt(
                     statements_text=statements_text,
                     physical_evidence_text=physical_evidence_text,
                 )
-                c_out = llm_client.generate_structured(
+                c_fut = executor.submit(
+                    llm_client.generate_structured,
                     prompt=c_prompt,
                     response_schema=ContradictionOutput,
                     system_prompt=CONTRADICTION_DETECTOR_SYSTEM_PROMPT,
                 )
-                candidate_raw.extend(c_out.contradictions)
-                logger.info(f"Contradiction detector: {len(c_out.contradictions)} finding(s).")
-            except Exception as e:
-                logger.warning(f"Contradiction detector failed: {e}")
+                future_to_meta[c_fut] = ("contradiction", "statements")
+
+            # Collect results respecting the overall fan-out budget
+            time_spent = time.monotonic() - start_time
+            time_left = max(5.0, MAX_FAN_OUT_SECONDS - time_spent)
+            done, not_done = concurrent.futures.wait(
+                future_to_meta.keys(),
+                timeout=time_left,
+                return_when=concurrent.futures.ALL_COMPLETED,
+            )
+
+            for fut in done:
+                kind, label = future_to_meta[fut]
+                try:
+                    out = fut.result()
+                    if kind == "connection" and hasattr(out, "proposals"):
+                        candidate_raw.extend(out.proposals)
+                        logger.info(f"Connection finder ({label}): {len(out.proposals)} proposal(s).")
+                    elif kind == "contradiction" and hasattr(out, "contradictions"):
+                        candidate_raw.extend(out.contradictions)
+                        logger.info(f"Contradiction detector: {len(out.contradictions)} finding(s).")
+                except Exception as e:
+                    logger.warning(f"{kind} failed for {label}: {e}")
+
+            if not_done:
+                logger.warning(f"Fan-out budget exceeded; {len(not_done)} tasks incomplete.")
     else:
         logger.info("No LLM client available; returning empty candidate proposal set.")
 

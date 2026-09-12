@@ -65,12 +65,15 @@ export interface WorkspaceProps {
   onReopenVault?: () => void
   activeView?: ActiveView
   onViewChange?: (view: ActiveView) => void
-  onSelectFile: (path: string) => void
+  onSelectFile: (path: string | null) => void
   onOpenVault: () => void
   onNewNote: () => void
   onNewFolder: () => void
   onQuickSwitcher: () => void
   onSearch: () => void
+  editorMode?: 'live-preview' | 'source' | 'reading' | 'split'
+  onToggleEditorMode?: () => void
+  onSetEditorMode?: (mode: 'live-preview' | 'source' | 'reading') => void
 }
 
 export function Workspace(p: WorkspaceProps) {
@@ -132,6 +135,9 @@ function formatCaseDisplayName(id: string | null): string {
         console.warn('Live vault parsing error, using default graph data:', err)
       }
     }
+    if (import.meta.env?.DEV) {
+      console.warn('[Workspace] Vault parsing yielded 0 nodes; using DEFAULT_GRAPH_DATA fallback.')
+    }
     return DEFAULT_GRAPH_DATA
   }, [p.noteContents, p.vaultName])
 
@@ -147,10 +153,20 @@ function formatCaseDisplayName(id: string | null): string {
     })
   }, [activeView, p, setView])
 
-  const [tabs, setTabs] = useState<Tab[]>(() => [newTab()])
+  const path = p.activeFile?.path ?? null
+  const [tabs, setTabs] = useState<Tab[]>(() => [newTab(path)])
   const [activeTab, setActiveTab] = useState<string>(() => tabs[0].id)
   const [closingTabIds, setClosingTabIds] = useState<string[]>([])
-  const path = p.activeFile?.path ?? null
+
+  const tabsRef = useRef(tabs)
+  const activeTabRef = useRef(activeTab)
+  const closingTabIdsRef = useRef(closingTabIds)
+
+  useEffect(() => {
+    tabsRef.current = tabs
+    activeTabRef.current = activeTab
+    closingTabIdsRef.current = closingTabIds
+  }, [tabs, activeTab, closingTabIds])
 
   // Note Navigation History Stack (BUG-03)
   const [history, setHistory] = useState<string[]>([])
@@ -224,15 +240,19 @@ function formatCaseDisplayName(id: string | null): string {
     window.addEventListener('pointerdown', handleClickOutside)
     return () => window.removeEventListener('pointerdown', handleClickOutside)
   }, [isMoreMenuOpen])
+
   useEffect(() => {
     if (!path) return
     setView('editor')
     setTabs((prev) => {
-      if (prev.some((t) => t.path === path)) {
-        setActiveTab(prev.find((t) => t.path === path)!.id)
+      const existing = prev.find((t) => t.path === path && !closingTabIdsRef.current.includes(t.id))
+      if (existing) {
+        if (activeTabRef.current !== existing.id) {
+          setActiveTab(existing.id)
+        }
         return prev
       }
-      const cur = prev.find((t) => t.id === activeTab)
+      const cur = prev.find((t) => t.id === activeTabRef.current && !closingTabIdsRef.current.includes(t.id))
       if (cur && cur.path === null) {
         return prev.map((t) => (t.id === cur.id ? { ...t, path } : t))
       }
@@ -240,35 +260,67 @@ function formatCaseDisplayName(id: string | null): string {
       setActiveTab(t.id)
       return [...prev, t]
     })
-  }, [activeTab, path])
+  }, [path, setView])
 
-  const openEmptyTab = () => {
-    const t = newTab()
+  const openEmptyTab = useCallback(() => {
+    const t = newTab(null)
     setTabs((prev) => [...prev, t])
     setActiveTab(t.id)
-  }
+    p.onSelectFile(null)
+  }, [p])
 
-  const closeTab = useCallback((id: string) => {
-    setClosingTabIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+  const closeTab = useCallback(
+    (id: string) => {
+      if (closingTabIdsRef.current.includes(id)) return
+      const currentTabs = tabsRef.current
+      if (!currentTabs.some((t) => t.id === id)) return
 
-    setTimeout(() => {
-      setTabs((prev) => {
-        if (prev.length <= 1) {
-          setClosingTabIds((c) => c.filter((x) => x !== id))
-          return [newTab()]
+      const activeId = activeTabRef.current
+      const aliveTabs = currentTabs.filter((t) => !closingTabIdsRef.current.includes(t.id))
+
+      if (aliveTabs.length <= 1) {
+        const blank = newTab(null)
+        setClosingTabIds([])
+        setTabs([blank])
+        setActiveTab(blank.id)
+        p.onSelectFile(null)
+        return
+      }
+
+      if (id === activeId) {
+        const closingIndex = aliveTabs.findIndex((t) => t.id === id)
+        const remainingAlive = aliveTabs.filter((t) => t.id !== id)
+        const nextIndex = Math.min(Math.max(0, closingIndex), remainingAlive.length - 1)
+        const nextTab = remainingAlive[nextIndex]
+
+        if (nextTab) {
+          setActiveTab(nextTab.id)
+          if (nextTab.path) {
+            p.onSelectFile(nextTab.path)
+          } else {
+            p.onSelectFile(null)
+          }
         }
-        const i = prev.findIndex((t) => t.id === id)
-        const next = prev.filter((t) => t.id !== id)
-        if (id === activeTab) {
-          const focus = next[Math.min(i, next.length - 1)]
-          setActiveTab(focus.id)
-          if (focus.path && focus.path !== path) p.onSelectFile(focus.path)
-        }
-        setClosingTabIds((c) => c.filter((x) => x !== id))
-        return next
-      })
-    }, 160)
-  }, [activeTab, p, path])
+      }
+
+      setClosingTabIds((prev) => [...prev, id])
+
+      setTimeout(() => {
+        setTabs((prev) => {
+          const next = prev.filter((t) => t.id !== id)
+          if (next.length === 0) {
+            const blank = newTab(null)
+            setActiveTab(blank.id)
+            p.onSelectFile(null)
+            return [blank]
+          }
+          return next
+        })
+        setClosingTabIds((prev) => prev.filter((x) => x !== id))
+      }, 160)
+    },
+    [p]
+  )
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -284,7 +336,7 @@ function formatCaseDisplayName(id: string | null): string {
         const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
         if (!isInput) {
           e.preventDefault()
-          closeTab(activeTab)
+          closeTab(activeTabRef.current)
         }
       } else if (e.altKey && e.key === 'ArrowLeft') {
         e.preventDefault()
@@ -296,7 +348,7 @@ function formatCaseDisplayName(id: string | null): string {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeTab, activeView, closeTab, setView, goBack, goForward])
+  }, [activeView, closeTab, goBack, goForward, openEmptyTab, setView])
 
   useEffect(() => {
     localStorage.setItem('sb_left_open', String(leftOpen))
@@ -306,24 +358,37 @@ function formatCaseDisplayName(id: string | null): string {
     localStorage.setItem('sb_right_open', String(rightOpen))
   }, [rightOpen])
 
-  const selectTab = (t: Tab) => {
-    setActiveTab(t.id)
-    if (t.path && t.path !== path) p.onSelectFile(t.path)
-  }
+  const selectTab = useCallback(
+    (t: Tab) => {
+      if (closingTabIdsRef.current.includes(t.id)) return
+      setActiveTab(t.id)
+      if (t.path) {
+        if (t.path !== path) {
+          p.onSelectFile(t.path)
+        }
+      } else {
+        if (path !== null) {
+          p.onSelectFile(null)
+        }
+      }
+    },
+    [p, path]
+  )
 
   const current = tabs.find((t) => t.id === activeTab) ?? tabs[0]
-  const showEditor = current?.path !== null && current?.path === path
+  const currentPath = current?.path
+  const showEditor = currentPath !== null && currentPath === path
 
   const copyCurrentPath = useCallback(() => {
-    if (current?.path) {
-      void navigator.clipboard.writeText(current.path)
+    if (currentPath) {
+      void navigator.clipboard.writeText(currentPath)
       setCopyFeedback(true)
       setTimeout(() => {
         setCopyFeedback(false)
         setIsMoreMenuOpen(false)
       }, 1200)
     }
-  }, [current?.path])
+  }, [currentPath])
 
   return (
     <div className="ws">
@@ -512,7 +577,7 @@ function formatCaseDisplayName(id: string | null): string {
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', minWidth: 0, overflow: 'hidden' }}>
-                            <span style={{ color: 'var(--color-amber)', fontSize: 13 }}>★</span>
+                            <span style={{ color: 'var(--e-org)', fontSize: 13 }}>★</span>
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--fs-sm)' }}>
                               {noteName}
                             </span>
@@ -627,6 +692,7 @@ function formatCaseDisplayName(id: string | null): string {
                       onAuxClick={(e) => {
                         if (e.button === 1) {
                           e.preventDefault()
+                          e.stopPropagation()
                           closeTab(t.id)
                         }
                       }}
@@ -715,6 +781,51 @@ function formatCaseDisplayName(id: string | null): string {
                 </div>
                 <span className="ws-grow" />
 
+                {/* Obsidian View Mode Switcher */}
+                {activeView !== 'graph' && p.onSetEditorMode && (
+                  <div className="ws-mode-switcher" role="group" aria-label="Editor view mode">
+                    <button
+                      type="button"
+                      className={`ws-mode-btn${p.editorMode === 'live-preview' ? ' is-active' : ''}`}
+                      title="Live Preview (Formatting applied automatically) — ⌘E"
+                      aria-label="Live Preview"
+                      onClick={() => p.onSetEditorMode?.('live-preview')}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                      </svg>
+                      <span className="ws-mode-btn-text">Live</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`ws-mode-btn${p.editorMode === 'source' ? ' is-active' : ''}`}
+                      title="Source Mode (Raw .md file view) — ⌘E"
+                      aria-label="Source Mode"
+                      onClick={() => p.onSetEditorMode?.('source')}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="16 18 22 12 16 6" />
+                        <polyline points="8 6 2 12 8 18" />
+                      </svg>
+                      <span className="ws-mode-btn-text">Source</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`ws-mode-btn${p.editorMode === 'reading' ? ' is-active' : ''}`}
+                      title="Reading View (Rendered HTML) — ⌘E"
+                      aria-label="Reading View"
+                      onClick={() => p.onSetEditorMode?.('reading')}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                      </svg>
+                      <span className="ws-mode-btn-text">Reading</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Bookmark Toggle Button (BUG-06) */}
                 {current?.path && activeView !== 'graph' && (
                   <button
@@ -722,7 +833,7 @@ function formatCaseDisplayName(id: string | null): string {
                     className={`ws-pane-action-btn${bookmarks.includes(current.path) ? ' is-active' : ''}`}
                     title={bookmarks.includes(current.path) ? 'Remove bookmark' : 'Bookmark note'}
                     aria-label={bookmarks.includes(current.path) ? 'Remove bookmark' : 'Bookmark note'}
-                    style={{ color: bookmarks.includes(current.path) ? 'var(--color-amber, #f59e0b)' : undefined, marginRight: 4 }}
+                    style={{ color: bookmarks.includes(current.path) ? 'var(--e-org)' : undefined, marginRight: 4 }}
                     onClick={() => toggleBookmark(current.path!)}
                   >
                     <Svg d={I.bookmark} />
@@ -794,14 +905,64 @@ function formatCaseDisplayName(id: string | null): string {
                         <Svg d={I.search} />
                         <span>Quick Switcher (⌘O)</span>
                       </button>
+                      {activeView !== 'graph' && p.onSetEditorMode && (
+                        <>
+                          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                          <div style={{ padding: '4px 10px 2px', fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            View Mode (⌘E)
+                          </div>
+                          <button
+                            type="button"
+                            className={`ws-topbar-menu-item${p.editorMode === 'live-preview' ? ' is-selected' : ''}`}
+                            onClick={() => {
+                              setIsMoreMenuOpen(false)
+                              p.onSetEditorMode?.('live-preview')
+                            }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 20h9" />
+                              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                            </svg>
+                            <span>{p.editorMode === 'live-preview' ? '✓ Live Preview' : 'Live Preview'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className={`ws-topbar-menu-item${p.editorMode === 'source' ? ' is-selected' : ''}`}
+                            onClick={() => {
+                              setIsMoreMenuOpen(false)
+                              p.onSetEditorMode?.('source')
+                            }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="16 18 22 12 16 6" />
+                              <polyline points="8 6 2 12 8 18" />
+                            </svg>
+                            <span>{p.editorMode === 'source' ? '✓ Source Mode (raw .md)' : 'Source Mode (raw .md)'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className={`ws-topbar-menu-item${p.editorMode === 'reading' ? ' is-selected' : ''}`}
+                            onClick={() => {
+                              setIsMoreMenuOpen(false)
+                              p.onSetEditorMode?.('reading')
+                            }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                            </svg>
+                            <span>{p.editorMode === 'reading' ? '✓ Reading View' : 'Reading View'}</span>
+                          </button>
+                        </>
+                      )}
                       <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
                       <button
                         type="button"
                         className="ws-topbar-menu-item"
-                        style={{ color: 'var(--color-red)' }}
+                        style={{ color: 'var(--danger)' }}
                         onClick={() => {
                           setIsMoreMenuOpen(false)
-                          closeTab(activeTab)
+                          closeTab(activeTabRef.current)
                         }}
                       >
                         <Svg d={I.x} />
@@ -826,7 +987,7 @@ function formatCaseDisplayName(id: string | null): string {
                       <button type="button" className="ws-empty-action" onClick={p.onQuickSwitcher}>
                         Go to file <span className="ws-empty-kbd">(⌘ O)</span>
                       </button>
-                      <button type="button" className="ws-empty-action ws-empty-close" onClick={() => closeTab(activeTab)}>
+                      <button type="button" className="ws-empty-action ws-empty-close" onClick={() => closeTab(activeTabRef.current)}>
                         Close
                       </button>
                     </div>
@@ -860,18 +1021,17 @@ function formatCaseDisplayName(id: string | null): string {
               <aside className="ws-pane ws-pane-right ws-pane-copilot">
                 <div className="ws-pane-copilot-head">
                   <div className="ws-copilot-title">
-                    <Svg d={I.copilot} />
                     <span>Copilot</span>
                   </div>
                   <span className="ws-grow" />
                   <button
                     type="button"
                     className="ws-pane-action-btn"
-                    title="Close Copilot"
-                    aria-label="Close Copilot"
+                    title="Collapse sidebar"
+                    aria-label="Collapse sidebar"
                     onClick={() => setRightOpen(false)}
                   >
-                    <Svg d={I.x} />
+                    <Svg d={I.panelRight} />
                   </button>
                 </div>
                 <CopilotPanel
@@ -890,12 +1050,14 @@ function formatCaseDisplayName(id: string | null): string {
 
           <StatusBar
             caseName={p.vaultName ?? 'Obsidian Vault'}
-            filePath={path}
-            wordCount={p.wordCount}
-            saveStatus={p.saveStatus}
+            filePath={current?.path ?? null}
+            wordCount={current?.path ? p.wordCount : 0}
+            saveStatus={current?.path ? p.saveStatus : 'saved'}
             noteCount={p.files.filter((f) => f.path.endsWith('.md')).length}
             linkCount={graphData?.edges?.length}
             activeView={activeView}
+            editorMode={p.editorMode}
+            onToggleEditorMode={p.onToggleEditorMode}
             nodeCount={graphData?.nodes?.length}
             edgeCount={graphData?.edges?.length}
           />

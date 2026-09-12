@@ -30,6 +30,21 @@ LAWS OF INVESTIGATION:
 2. Every link MUST carry a source_doc_id and locator copied verbatim from the evidence you were given (e.g. source_doc_id "DOC_CDR_9812345678", locator "row:48219", or source_doc_id "DOC_FIR_0142", locator "p:2 l:9").
 3. Nothing is asserted without a citation. Uncited claims are rejected.
 4. Output JSON strictly matching the requested schema. Keep the "proposals" list short (at most 3 items) and only include connections you are confident about.
+
+Example Valid JSON Response:
+{
+  "proposals": [
+    {
+      "claim": "Direct call coordination during Murthal toll incident",
+      "reason": "14 incoming calls logged within 2 hours of incident",
+      "source_doc_id": "DOC_FIR_0142",
+      "locator": "p:2 l:9",
+      "source_entity": "Vikram Singh",
+      "target_entity": "Sandeep Kala",
+      "confidence": 0.92
+    }
+  ]
+}
 """
 
 
@@ -45,7 +60,7 @@ class ConnectionCandidate(BaseModel):
 
 
 class ConnectionFinderOutput(BaseModel):
-    proposals: list[ConnectionCandidate] = Field(default_factory=list)
+    proposals: list[ConnectionCandidate]
 
 
 def build_connection_prompt(

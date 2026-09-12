@@ -11,7 +11,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "isUnresolved": false,
       "names": [
         "Amit Malik",
-        "\\u0905\\u092E\\u093F\\u0924 \\u092E\\u0932\\u093F\\u0915"
+        "अमित मलिक"
       ],
       "identifiers": [
         "9812099881",
@@ -24,7 +24,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "role": "accused",
         "names": [
           "Amit Malik",
-          "\\u0905\\u092E\\u093F\\u0924 \\u092E\\u0932\\u093F\\u0915"
+          "अमित मलिक"
         ],
         "identifiers": [
           "9812099881",
@@ -45,7 +45,8 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "filePath": "01_People/Balwinder Singh.md",
       "isUnresolved": false,
       "names": [
-        "[Balwinder Singh, \"\\u092C\\u0932\\u0935\\u093F\\u0902\\u0926\\u0930 \\u0938\\u093F\\u0902\\u0939\\"
+        "Balwinder Singh",
+        "बलविंदर सिंह"
       ],
       "identifiers": [
         "9812155443",
@@ -55,7 +56,10 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "id": "person_0035",
         "type": "person",
         "role": "accused",
-        "names": "[Balwinder Singh, \"\\u092C\\u0932\\u0935\\u093F\\u0902\\u0926\\u0930 \\u0938\\u093F\\u0902\\u0939\\",
+        "names": [
+          "Balwinder Singh",
+          "बलविंदर सिंह"
+        ],
         "identifiers": [
           "9812155443",
           "867812034912001"
@@ -74,7 +78,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "filePath": "01_People/Inspector Ramphal.md",
       "isUnresolved": false,
       "names": [
-        "[Inspector Ramphal, \"\\u0928\\u093F\\u0930\\u0940\\u0915\\u094D\\u0937\\u0915 \\u0930\\u093E\\"
+        "[Inspector Ramphal, \"निरीक्षक रा\\"
       ],
       "identifiers": [
         "9812555002"
@@ -83,7 +87,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "id": "person_0002",
         "type": "person",
         "role": "officer",
-        "names": "[Inspector Ramphal, \"\\u0928\\u093F\\u0930\\u0940\\u0915\\u094D\\u0937\\u0915 \\u0930\\u093E\\",
+        "names": "[Inspector Ramphal, \"निरीक्षक रा\\",
         "identifiers": [
           "9812555002"
         ],
@@ -102,7 +106,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "isUnresolved": false,
       "names": [
         "Jagdish Chander",
-        "\\u091C\\u0917\\u0926\\u0940\\u0936 \\u091A\\u0902\\u0926\\u0930"
+        "जगदीश चंदर"
       ],
       "identifiers": [
         "9812777001"
@@ -113,7 +117,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "role": "witness",
         "names": [
           "Jagdish Chander",
-          "\\u091C\\u0917\\u0926\\u0940\\u0936 \\u091A\\u0902\\u0926\\u0930"
+          "जगदीश चंदर"
         ],
         "identifiers": [
           "9812777001"
@@ -133,7 +137,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "isUnresolved": false,
       "names": [
         "Jaideep Malik",
-        "\\u091C\\u092F\\u0926\\u0940\\u092A \\u092E\\u0932\\u093F\\u0915"
+        "जयदीप मलिक"
       ],
       "identifiers": [
         "9812888102"
@@ -144,7 +148,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "role": "accused",
         "names": [
           "Jaideep Malik",
-          "\\u091C\\u092F\\u0926\\u0940\\u092A \\u092E\\u0932\\u093F\\u0915"
+          "जयदीप मलिक"
         ],
         "identifiers": [
           "9812888102"
@@ -163,7 +167,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "filePath": "01_People/Kuldeep @ KD.md",
       "isUnresolved": false,
       "names": [
-        "[Kuldeep @ KD, \"\\u0915\\u0941\\u0932\\u0926\\u0940\\u092A \\u0909\\u0930\\u094D\\u092B \\u0915\\"
+        "[Kuldeep @ KD, \"कुलदीप उर्फ क\\"
       ],
       "identifiers": [
         "9812888101",
@@ -173,7 +177,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "id": "person_0036",
         "type": "person",
         "role": "accused",
-        "names": "[Kuldeep @ KD, \"\\u0915\\u0941\\u0932\\u0926\\u0940\\u092A \\u0909\\u0930\\u094D\\u092B \\u0915\\",
+        "names": "[Kuldeep @ KD, \"कुलदीप उर्फ क\\",
         "identifiers": [
           "9812888101",
           "866789435267006"
@@ -193,7 +197,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "isUnresolved": false,
       "names": [
         "Manjeet Hooda",
-        "\\u092E\\u0902\\u091C\\u0940\\u0924 \\u0939\\u0941\\u0921\\u094D\\u0921\\u093E"
+        "मंजीत हुड्डा"
       ],
       "identifiers": [
         "9812888104"
@@ -204,7 +208,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "role": "accused",
         "names": [
           "Manjeet Hooda",
-          "\\u092E\\u0902\\u091C\\u0940\\u0924 \\u0939\\u0941\\u0921\\u094D\\u0921\\u093E"
+          "मंजीत हुड्डा"
         ],
         "identifiers": [
           "9812888104"
@@ -224,7 +228,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "isUnresolved": false,
       "names": [
         "Naresh Bansal",
-        "\\u0928\\u0930\\u0947\\u0936 \\u092C\\u0902\\u0938\\u0932"
+        "नरेश बंसल"
       ],
       "identifiers": [
         "9812666001",
@@ -236,7 +240,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "role": "complainant",
         "names": [
           "Naresh Bansal",
-          "\\u0928\\u0930\\u0947\\u0936 \\u092C\\u0902\\u0938\\u0932"
+          "नरेश बंसल"
         ],
         "identifiers": [
           "9812666001",
@@ -256,7 +260,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "filePath": "01_People/Naveen Boxer.md",
       "isUnresolved": false,
       "names": [
-        "[Naveen Boxer, Naveen Kumar, \"\\u0928\\u0935\\u0940\\u0928 \\u0915\\u0941\\u092E\\u093E\\u0930\\"
+        "[Naveen Boxer, Naveen Kumar, \"नवीन कुमार\\"
       ],
       "identifiers": [
         "9812888103"
@@ -265,7 +269,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "id": "person_0038",
         "type": "person",
         "role": "accused",
-        "names": "[Naveen Boxer, Naveen Kumar, \"\\u0928\\u0935\\u0940\\u0928 \\u0915\\u0941\\u092E\\u093E\\u0930\\",
+        "names": "[Naveen Boxer, Naveen Kumar, \"नवीन कुमार\\",
         "identifiers": [
           "9812888103"
         ],
@@ -283,7 +287,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "filePath": "01_People/Rajbir Singh.md",
       "isUnresolved": false,
       "names": [
-        "[Rajbir Singh, Rajbir Singh @ Munna, \"\\u0930\\u093E\\u091C\\u092C\\u0940\\u0930 \\u0938\\u093F\\"
+        "[Rajbir Singh, Rajbir Singh @ Munna, \"राजबीर सि\\"
       ],
       "identifiers": [
         "9812888105",
@@ -293,7 +297,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "id": "person_0041",
         "type": "person",
         "role": "accused",
-        "names": "[Rajbir Singh, Rajbir Singh @ Munna, \"\\u0930\\u093E\\u091C\\u092C\\u0940\\u0930 \\u0938\\u093F\\",
+        "names": "[Rajbir Singh, Rajbir Singh @ Munna, \"राजबीर सि\\",
         "identifiers": [
           "9812888105",
           "HR-79-A-9901"
@@ -313,7 +317,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "isUnresolved": false,
       "names": [
         "Rehan Khan",
-        "\\u0930\\u0947\\u0939\\u093E\\u0928 \\u0916\\u093E\\u0928"
+        "रेहान खान"
       ],
       "identifiers": [
         "9896011223",
@@ -326,7 +330,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "role": "accused",
         "names": [
           "Rehan Khan",
-          "\\u0930\\u0947\\u0939\\u093E\\u0928 \\u0916\\u093E\\u0928"
+          "रेहान खान"
         ],
         "identifiers": [
           "9896011223",
@@ -348,7 +352,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "isUnresolved": false,
       "names": [
         "Rohit Kumar",
-        "\\u0930\\u094B\\u0939\\u093F\\u0924 \\u0915\\u0941\\u092E\\u093E\\u0930"
+        "रोहित कुमार"
       ],
       "identifiers": [
         "9812999004"
@@ -359,7 +363,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "role": "witness",
         "names": [
           "Rohit Kumar",
-          "\\u0930\\u094B\\u0939\\u093F\\u0924 \\u0915\\u0941\\u092E\\u093E\\u0930"
+          "रोहित कुमार"
         ],
         "identifiers": [
           "9812999004"
@@ -378,7 +382,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "filePath": "01_People/Rohit Pehalwan.md",
       "isUnresolved": false,
       "names": [
-        "[Rohit Pehalwan, Rohit Dahiya, \"\\u0930\\u094B\\u0939\\u093F\\u0924 \\u0926\\u0939\\u093F\\u092F\\"
+        "[Rohit Pehalwan, Rohit Dahiya, \"रोहित दहिय\\"
       ],
       "identifiers": [
         "9812900011",
@@ -388,7 +392,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "id": "person_0033",
         "type": "person",
         "role": "accused",
-        "names": "[Rohit Pehalwan, Rohit Dahiya, \"\\u0930\\u094B\\u0939\\u093F\\u0924 \\u0926\\u0939\\u093F\\u092F\\",
+        "names": "[Rohit Pehalwan, Rohit Dahiya, \"रोहित दहिय\\",
         "identifiers": [
           "9812900011",
           "865678324156005"
@@ -408,7 +412,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "isUnresolved": false,
       "names": [
         "SI Rajesh Kumar",
-        "\\u0930\\u093E\\u091C\\u0947\\u0936 \\u0915\\u0941\\u092E\\u093E\\u0930"
+        "राजेश कुमार"
       ],
       "identifiers": [
         "9812555001"
@@ -419,7 +423,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "role": "officer",
         "names": [
           "SI Rajesh Kumar",
-          "\\u0930\\u093E\\u091C\\u0947\\u0936 \\u0915\\u0941\\u092E\\u093E\\u0930"
+          "राजेश कुमार"
         ],
         "identifiers": [
           "9812555001"
@@ -438,7 +442,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "filePath": "01_People/Sandeep Kala.md",
       "isUnresolved": false,
       "names": [
-        "[Sandeep Kala, \"\\u0938\\u0902\\u0926\\u0940\\u092A \\u0909\\u0930\\u094D\\u092B \\u0915\\u093E\\"
+        "[Sandeep Kala, \"संदीप उर्फ का\\"
       ],
       "identifiers": [
         "9812700022",
@@ -449,7 +453,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "id": "person_0034",
         "type": "person",
         "role": "accused",
-        "names": "[Sandeep Kala, \"\\u0938\\u0902\\u0926\\u0940\\u092A \\u0909\\u0930\\u094D\\u092B \\u0915\\u093E\\",
+        "names": "[Sandeep Kala, \"संदीप उर्फ का\\",
         "identifiers": [
           "9812700022",
           "867890546378007",
@@ -470,7 +474,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "isUnresolved": false,
       "names": [
         "Satish Grover",
-        "\\u0938\\u0924\\u0940\\u0936 \\u0917\\u094D\\u0930\\u094B\\u0935\\u0930"
+        "सतीश ग्रोवर"
       ],
       "identifiers": [
         "9812666002"
@@ -481,7 +485,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "role": "victim",
         "names": [
           "Satish Grover",
-          "\\u0938\\u0924\\u0940\\u0936 \\u0917\\u094D\\u0930\\u094B\\u0935\\u0930"
+          "सतीश ग्रोवर"
         ],
         "identifiers": [
           "9812666002"
@@ -500,7 +504,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "filePath": "01_People/Suresh Shooter.md",
       "isUnresolved": false,
       "names": [
-        "[Suresh Shooter, Suresh Kumar, \"\\u0938\\u0941\\u0930\\u0947\\u0936 \\u0915\\u0941\\u092E\\u093E\\"
+        "[Suresh Shooter, Suresh Kumar, \"सुरेश कुमा\\"
       ],
       "identifiers": [
         "9812011234",
@@ -511,7 +515,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "id": "person_0032",
         "type": "person",
         "role": "accused",
-        "names": "[Suresh Shooter, Suresh Kumar, \"\\u0938\\u0941\\u0930\\u0947\\u0936 \\u0915\\u0941\\u092E\\u093E\\",
+        "names": "[Suresh Shooter, Suresh Kumar, \"सुरेश कुमा\\",
         "identifiers": [
           "9812011234",
           "862345091823002",
@@ -531,7 +535,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
       "filePath": "01_People/Vikram Singh.md",
       "isUnresolved": false,
       "names": [
-        "[Vikram Singh, \"\\u0935\\u093F\\u0915\\u094D\\u0930\\u092E \\u0938\\u093F\\u0902\\u0939\", Vicky"
+        "[Vikram Singh, \"विक्रम सिंह\", Vicky"
       ],
       "identifiers": [
         "9812345678",
@@ -541,7 +545,7 @@ export const DEFAULT_GRAPH_DATA: GraphData = {
         "id": "person_0031",
         "type": "person",
         "role": "accused",
-        "names": "[Vikram Singh, \"\\u0935\\u093F\\u0915\\u094D\\u0930\\u092E \\u0938\\u093F\\u0902\\u0939\", Vicky",
+        "names": "[Vikram Singh, \"विक्रम सिंह\", Vicky",
         "identifiers": [
           "9812345678",
           "869123456789012"

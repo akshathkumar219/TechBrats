@@ -23,11 +23,30 @@ from brain.linker import router as proposal_router
 from brain.cdr.router import router as cdr_router
 from brain.crosscase import router as crosscase_router
 from brain.vault import router as vault_router
+from brain.index.build import router as index_build_router
+from brain.index.incremental import router as index_incremental_router
+
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Warm up the local LLM in a background thread to prevent first-call latency."""
+    import threading
+    def _do_warmup():
+        try:
+            from brain.llm.client import get_llm_client
+            client = get_llm_client()
+            client.warmup()
+        except Exception:
+            pass
+    threading.Thread(target=_do_warmup, daemon=True).start()
+    yield
 
 app = FastAPI(
     title="SyndicateBrain API",
     description="Investigation workbench backend for Indian police (SIH26189).",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # CORS open to localhost:5173 per spec
@@ -44,6 +63,8 @@ app.include_router(proposal_router)
 app.include_router(cdr_router)
 app.include_router(crosscase_router)
 app.include_router(vault_router)
+app.include_router(index_build_router)
+app.include_router(index_incremental_router)
 
 
 @app.post("/api/case/analyse", response_model=AnalysisResult)

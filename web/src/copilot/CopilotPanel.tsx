@@ -277,22 +277,6 @@ export function CopilotPanel({
       {/* Panel Header */}
       <div className="copilot-header">
         <div className="copilot-header-left">
-          <span className="copilot-header-icon" aria-hidden="true">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 4a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-4a3 3 0 0 1 3-3h1V8a4 4 0 0 1 4-4z" />
-              <path d="M9.5 14h.01" />
-              <path d="M14.5 14h.01" />
-            </svg>
-          </span>
           <span className="copilot-header-title">Copilot</span>
         </div>
 
@@ -327,8 +311,8 @@ export function CopilotPanel({
               type="button"
               className="copilot-icon-btn"
               onClick={onClose}
-              title="Close copilot panel"
-              aria-label="Close copilot panel"
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
             >
               <svg
                 width="14"
@@ -341,8 +325,8 @@ export function CopilotPanel({
                 strokeLinejoin="round"
                 aria-hidden="true"
               >
-                <path d="M18 6L6 18" />
-                <path d="M6 6l12 12" />
+                <rect x="4" y="5" width="16" height="14" rx="1" />
+                <line x1="15" y1="5" x2="15" y2="19" />
               </svg>
             </button>
           )}

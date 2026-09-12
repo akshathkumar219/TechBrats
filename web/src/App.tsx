@@ -41,6 +41,9 @@ export function App() {
       { id: '3', label: 'Open note (Quick Switcher)...', category: 'Navigation', shortcut: '⌘O', action: () => setIsQuickSwitcherOpen(true) },
       { id: '4', label: 'Search in all notes...', category: 'Search', shortcut: '⌘⇧F', action: () => setIsGlobalSearchOpen(true) },
       { id: '5', label: `Cycle editor mode (currently ${editorMode})`, category: 'View', shortcut: '⌘E', action: cycleEditorMode },
+      { id: '5a', label: 'Switch to Live Preview mode (formatted)', category: 'View', action: () => setEditorMode('live-preview') },
+      { id: '5b', label: 'Switch to Source mode (raw .md file view)', category: 'View', action: () => setEditorMode('source') },
+      { id: '5c', label: 'Switch to Reading view (rendered)', category: 'View', action: () => setEditorMode('reading') },
       { id: '6', label: 'Open vault folder...', category: 'Vault', action: () => void openVault() },
       { id: '7', label: 'Keyboard shortcuts...', category: 'Help', shortcut: '⌘/', action: () => setIsShortcutsOpen(true) },
     ],
@@ -112,6 +115,9 @@ export function App() {
         onNewFolder={() => setIsFolderModalOpen(true)}
         onQuickSwitcher={() => setIsQuickSwitcherOpen(true)}
         onSearch={() => setIsGlobalSearchOpen(true)}
+        editorMode={editorMode}
+        onToggleEditorMode={cycleEditorMode}
+        onSetEditorMode={setEditorMode}
         sidebar={
           <FileTree
             files={files} folders={folders} selectedPath={activeFile?.path ?? null}

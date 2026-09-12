@@ -55,6 +55,7 @@ export function Editor({
               <CodeMirrorEditor
                 content={content}
                 files={files}
+                mode={effectiveMode}
                 readOnly={!activeFile || Boolean(activeFile.isLocked)}
                 placeholder={
                   activeFile?.isLocked
@@ -78,7 +79,7 @@ export function Editor({
     )
   }
 
-  // Default: Live Preview (or Source) — one single frame, CodeMirror only, centered 72ch
+  // Default: Live Preview or Source — one single frame, CodeMirror only
   return (
     <main className="center center-single">
       <section className="editor-pane">
@@ -86,6 +87,7 @@ export function Editor({
           <CodeMirrorEditor
             content={content}
             files={files}
+            mode={effectiveMode}
             readOnly={!activeFile || Boolean(activeFile.isLocked)}
             placeholder={
               activeFile?.isLocked

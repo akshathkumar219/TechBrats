@@ -81,20 +81,23 @@ class OllamaClient(LLMClient):
         base_url: str = "http://localhost:11434",
         model: str = "qwen2.5:3b-instruct",
         timeout: float = 60.0,
+        num_ctx: int = 8192,
     ):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
+        self.num_ctx = num_ctx
 
-    def _call_api(self, messages: list[dict[str, str]]) -> str:
+    def _call_api(self, messages: list[dict[str, str]], format_schema: Optional[Any] = "json") -> str:
         url = f"{self.base_url}/api/chat"
         payload = {
             "model": self.model,
             "messages": messages,
-            "format": "json",
+            "format": format_schema if format_schema is not None else "json",
             "stream": False,
             "options": {
                 "temperature": 0.0,
+                "num_ctx": self.num_ctx,
             },
         }
         data = json.dumps(payload).encode("utf-8")
@@ -147,6 +150,14 @@ class OllamaClient(LLMClient):
                                 parsed[k] = parsed["properties"][k]
                     if len(props) == 1 and props[0] not in parsed and len(parsed) == 1:
                         parsed[props[0]] = next(iter(parsed.values()))
+                    # Widen alias repair for list-valued keys when an expected list property is absent
+                    for prop_name, prop_meta in schema_dict.get("properties", {}).items():
+                        if prop_name not in parsed or not parsed[prop_name]:
+                            if isinstance(prop_meta, dict) and (prop_meta.get("type") == "array" or "items" in prop_meta):
+                                for k, v in parsed.items():
+                                    if k != prop_name and isinstance(v, list) and v:
+                                        parsed[prop_name] = v
+                                        break
                 return response_schema.model_validate(parsed)
             except Exception:
                 return response_schema.model_validate_json(cleaned_str)
@@ -154,8 +165,10 @@ class OllamaClient(LLMClient):
         # Attempt 1
         raw_output = ""
         try:
-            raw_output = self._call_api(messages)
+            raw_output = self._call_api(messages, format_schema=schema_dict)
             return _parse_and_validate(raw_output)
+        except ConnectionError:
+            raise
         except (ValidationError, json.JSONDecodeError, Exception) as first_err:
             logger.warning(
                 f"Ollama attempt 1 failed validation for {response_schema.__name__}: {first_err}. "
@@ -176,8 +189,10 @@ class OllamaClient(LLMClient):
             )
 
             try:
-                second_output = self._call_api(retry_messages)
+                second_output = self._call_api(retry_messages, format_schema=schema_dict)
                 return _parse_and_validate(second_output)
+            except ConnectionError:
+                raise
             except Exception as second_err:
                 logger.error(f"Ollama retry failed for {response_schema.__name__}: {second_err}")
                 raise ValueError(
@@ -310,15 +325,21 @@ def load_case_config(config_path: Optional[Union[str, Path]] = None) -> dict[str
         candidates.append(Path(config_path))
     candidates.extend([
         Path("Case_Config.yaml"),
+        Path("data/Case_01_Sonipat_Arms/Case_Config.yaml"),
         Path("vaults/Case_01_Sonipat_Arms/Case_Config.yaml"),
     ])
+    for parent in [Path("data"), Path("vaults")]:
+        if parent.exists():
+            for sub in parent.iterdir():
+                if sub.is_dir():
+                    candidates.append(sub / "Case_Config.yaml")
 
     for p in candidates:
         if p.exists() and p.is_file():
             try:
                 with open(p, "r", encoding="utf-8") as f:
                     data = yaml.safe_load(f)
-                    if isinstance(data, dict):
+                    if isinstance(data, dict) and data:
                         return data
             except Exception as e:
                 logger.warning(f"Failed reading config at {p}: {e}")
@@ -331,13 +352,14 @@ def get_llm_client(
     model: Optional[str] = None,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
+    num_ctx: Optional[int] = None,
 ) -> LLMClient:
     """
     Factory function returning the configured LLMClient.
     Priority:
     1. Explicit arguments
     2. Case_Config.yaml (keys: model_provider / provider, model_name / model)
-    3. Default: Ollama (qwen2.5:3b-instruct on http://localhost:11434)
+    3. Default: Ollama (qwen2.5:3b-instruct or llama3 on http://localhost:11434)
     """
     config = load_case_config(config_path)
 
@@ -366,7 +388,7 @@ def get_llm_client(
         or config.get("model_name")
         or config.get("model")
         or os.environ.get("OLLAMA_MODEL")
-        or "qwen2.5:3b-instruct"
+        or "llama3"
     )
     resolved_base_url = (
         base_url
@@ -374,4 +396,9 @@ def get_llm_client(
         or os.environ.get("OLLAMA_BASE_URL")
         or "http://localhost:11434"
     )
-    return OllamaClient(base_url=resolved_base_url, model=chosen_model)
+    resolved_num_ctx = (
+        num_ctx
+        or config.get("num_ctx")
+        or 8192
+    )
+    return OllamaClient(base_url=resolved_base_url, model=chosen_model, num_ctx=resolved_num_ctx)

@@ -8,6 +8,8 @@ interface StatusBarProps {
   linkCount?: number
   saveStatus?: 'saved' | 'unsaved'
   activeView?: 'editor' | 'graph'
+  editorMode?: 'live-preview' | 'source' | 'reading' | 'split'
+  onToggleEditorMode?: () => void
   nodeCount?: number
   edgeCount?: number
 }
@@ -36,6 +38,8 @@ export function StatusBar({
   linkCount,
   saveStatus = 'saved',
   activeView = 'editor',
+  editorMode,
+  onToggleEditorMode,
   nodeCount,
   edgeCount,
 }: StatusBarProps) {
@@ -116,6 +120,30 @@ export function StatusBar({
           </>
         ) : (
           <>
+            {editorMode && (
+              <>
+                <div className="status-item">
+                  <button
+                    type="button"
+                    className="status-mode-btn"
+                    title="Click to cycle editor mode (⌘E)"
+                    onClick={onToggleEditorMode}
+                  >
+                    <span>
+                      {editorMode === 'live-preview'
+                        ? '✦ Live Preview'
+                        : editorMode === 'source'
+                        ? '</> Source Mode'
+                        : editorMode === 'reading'
+                        ? '📖 Reading View'
+                        : 'Split View'}
+                    </span>
+                  </button>
+                </div>
+                <span className="status-sep">·</span>
+              </>
+            )}
+
             {filePath && (
               <>
                 <div className="status-item">

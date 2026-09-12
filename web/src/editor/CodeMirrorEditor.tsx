@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { EditorState, Compartment } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { buildExtensions } from './extensions'
+import { buildExtensions, livePreviewCompartment, getLivePreviewExtension } from './extensions'
 import type { VaultFile } from '../fs/vault'
 
 interface Props {
   content: string
   files: VaultFile[]
+  mode?: 'live-preview' | 'source' | 'reading' | 'split'
   readOnly: boolean
   placeholder: string
   onChange: (value: string) => void
@@ -20,7 +21,7 @@ interface Props {
  * editor down — that keeps undo history sane and avoids a full remount on
  * every file click.
  */
-export function CodeMirrorEditor({ content, files, readOnly, placeholder, onChange }: Props) {
+export function CodeMirrorEditor({ content, files, mode, readOnly, placeholder, onChange }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
 
@@ -41,6 +42,7 @@ export function CodeMirrorEditor({ content, files, readOnly, placeholder, onChan
         ...buildExtensions({
           getFiles: () => filesRef.current,
           placeholder,
+          isSourceMode: mode === 'source',
         }),
         readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly)),
         EditorView.updateListener.of((update) => {
@@ -82,6 +84,16 @@ export function CodeMirrorEditor({ content, files, readOnly, placeholder, onChan
       effects: readOnlyCompartment.current.reconfigure(EditorState.readOnly.of(readOnly)),
     })
   }, [readOnly])
+
+  // Toggle between Live Preview and Source mode dynamically without rebuilding the editor
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    const isSource = mode === 'source'
+    view.dispatch({
+      effects: livePreviewCompartment.reconfigure(getLivePreviewExtension(isSource)),
+    })
+  }, [mode])
 
   return <div ref={hostRef} className="cm-host" />
 }
