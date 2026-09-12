@@ -75,9 +75,13 @@ def get_copilot_ask(question: Optional[str] = None, case_id: Optional[str] = Non
 
 
 @app.get("/api/case/integrity", response_model=IntegrityResponse)
-def get_case_integrity(case_id: Optional[str] = None):
+def get_case_integrity(
+    case_path: Optional[str] = None,
+    case_id: Optional[str] = None,
+):
     """Verify evidence integrity across 00_Raw_Inputs/ against SHA-256 sidecars."""
-    return mocks.get_case_integrity(case_id=case_id)
+    from brain.integrity import get_case_integrity as real_get_case_integrity
+    return real_get_case_integrity(case_path=case_path, case_id=case_id)
 
 
 @app.get("/api/crosscase/hits", response_model=CrossCaseResponse)
