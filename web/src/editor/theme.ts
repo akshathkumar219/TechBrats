@@ -133,10 +133,10 @@ export const editorTheme = EditorView.theme(
 export const markdownHighlight = HighlightStyle.define([
   { tag: t.processingInstruction, color: 'var(--text-faint)' },
 
-  { tag: t.heading1, color: 'var(--text-primary)', fontWeight: '600', fontSize: '1.55em', lineHeight: '1.3' },
-  { tag: t.heading2, color: 'var(--text-primary)', fontWeight: '600', fontSize: '1.30em', lineHeight: '1.35' },
-  { tag: t.heading3, color: 'var(--text-primary)', fontWeight: '600', fontSize: '1.12em' },
-  { tag: [t.heading4, t.heading5, t.heading6], color: 'var(--text-primary)', fontWeight: '600' },
+  { tag: t.heading1, fontSize: 'var(--fs-xl)', fontWeight: '600', color: 'var(--text-primary)' },
+  { tag: t.heading2, fontSize: 'var(--fs-lg)', fontWeight: '600', color: 'var(--text-primary)' },
+  { tag: t.heading3, fontSize: 'var(--fs-md)', fontWeight: '600', color: 'var(--text-primary)' },
+  { tag: [t.heading4, t.heading5, t.heading6], fontSize: 'var(--fs-base)', fontWeight: '600', color: 'var(--text-primary)' },
 
   { tag: t.strong, fontWeight: '700', color: 'var(--text-primary)' },
   { tag: t.emphasis, fontStyle: 'italic', color: 'var(--text-primary)' },
@@ -152,12 +152,12 @@ export const markdownHighlight = HighlightStyle.define([
   { tag: t.contentSeparator, color: 'var(--border-strong)' },
 
   // Fenced code block contents
-  { tag: t.keyword, color: '#C2569E' },
+  { tag: t.keyword, color: 'var(--hypothesis)' },
   { tag: [t.string, t.special(t.string)], color: 'var(--ok)' },
   { tag: [t.number, t.bool, t.null], color: 'var(--accent)' },
   { tag: t.comment, color: 'var(--text-faint)', fontStyle: 'italic' },
   { tag: [t.function(t.variableName), t.labelName], color: 'var(--info)' },
-  { tag: t.typeName, color: '#6FA8A0' },
+  { tag: t.typeName, color: 'var(--e-device)' },
 ])
 
 export const syntaxTheme = syntaxHighlighting(markdownHighlight)
