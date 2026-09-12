@@ -160,10 +160,10 @@ different command to work around it.
 Tick as you go. Four are already on `main`.
 
 **Block 1 · W0–2** ✅ AKS-T01 ✅ AKS-T02 ✅ HAR-T01 ✅ HAR-T02
-**Block 2 · W2–3** ☐ AKS-T03 ☐ SHO-T01 ☐ HER-T01 ☐ AKT-T01 ☐ MEH-T01
-**Block 3 · W3–6** ☐ AKS-T04 ☐ HAR-T03 ☐ AKT-T02 ☐ SHO-T02 ☐ MEH-T02 ☐ HER-T02
-**Block 4 · W6–10** ☐ AKS-T05 ☐ HER-T03 ☐ HAR-T04 ☐ MEH-T03 ☐ AKT-T03 ☐ SHO-T03
-**Block 5 · W10–11** ☐ AKS-T06 ☐ SHO-T04 ☐ HER-T04 ☐ HAR-T05 ☐ [verify by hand]
+**Block 2 · W2–3** ✅ AKS-T03 ✅ SHO-T01 ✅ HER-T01 ✅ AKT-T01 ✅ MEH-T01
+**Block 3 · W3–6** ✅ AKS-T04 ✅ HAR-T03 ✅ AKT-T02 ✅ SHO-T02 ✅ MEH-T02 ✅ HER-T02
+**Block 4 · W6–10** ✅ AKS-T05 ✅ HER-T03 ✅ HAR-T04 ✅ MEH-T03 ✅ AKT-T03 ✅ SHO-T03
+**Block 5 · W10–11** ✅ AKS-T06 ✅ SHO-T04 ✅ HER-T04 ✅ HAR-T05 ✅ [verify by hand]
 **Block 6 · W11–13** ☐ MEH-T04 ☐ AKT-T04 ☐ HAR-T06 ☐ HER-T05
 **Block 7 · W13–16** ☐ MEH-T05 ☐ SHO-T05 ☐ AKS-T07 ☐ HAR-T07 ☐ AKT-T05 ☐ HER-T06
 
