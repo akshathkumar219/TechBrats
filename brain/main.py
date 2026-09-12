@@ -45,13 +45,16 @@ def get_cases():
 def post_case_analyse(payload: Optional[dict[str, Any]] = Body(None)):
     """Run agent layer analysis on a case, returning proposals and summary."""
     case_id = payload.get("case_id") if payload else None
-    return mocks.analyse_case(case_id=case_id)
+    case_path = payload.get("case_path") if payload else None
+    from brain.orchestrator import analyse_case
+    return analyse_case(case_id=case_id, case_path=case_path)
 
 
 @app.get("/api/case/analyse", response_model=AnalysisResult)
-def get_case_analyse(case_id: Optional[str] = None):
+def get_case_analyse(case_id: Optional[str] = None, case_path: Optional[str] = None):
     """GET convenience for case analysis."""
-    return mocks.analyse_case(case_id=case_id)
+    from brain.orchestrator import analyse_case
+    return analyse_case(case_id=case_id, case_path=case_path)
 
 
 @app.post("/api/copilot/ask", response_model=CopilotResponse)
