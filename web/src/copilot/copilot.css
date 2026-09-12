@@ -370,14 +370,52 @@
 
 /* ---- Error Container ---- */
 .copilot-error-box {
-  background-color: var(--danger-bg);
-  border: 1px solid var(--danger);
-  border-radius: var(--r-sm);
-  padding: var(--s2) var(--s3);
+  background-color: transparent;
   margin-top: var(--s2);
   display: flex;
   flex-direction: column;
   gap: var(--s2);
+}
+
+/* ---- NO ANSWER FOUND ("I don't know" state) per HER-T06 ---- */
+.copilot-no-answer-card {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s3) var(--s4);
+  margin-top: var(--s2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.copilot-no-answer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-dim);
+  padding: 2px var(--s2);
+  border-radius: var(--r-full);
+}
+
+.copilot-no-answer-headline {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.copilot-no-answer-subtext {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
 }
 
 .copilot-error-msg {

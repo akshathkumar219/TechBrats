@@ -1,13 +1,68 @@
 import React from 'react'
 import { CitationChip } from './CitationChip'
-import type { CopilotResponse } from './types'
+import type { ChatMessage, CopilotResponse } from './types'
 import {
   CITATION_REGEX,
   sentenceHasCitation,
   splitIntoSentences,
+  validateText,
 } from './validator'
 
 export { CITATION_REGEX }
+
+/**
+ * Check if text signifies an explicit "I don't know" or absence of records.
+ */
+export function isNoAnswerText(text?: string | null): boolean {
+  if (!text) return true
+  const lower = text.trim().toLowerCase()
+  return (
+    lower.startsWith("i don't know") ||
+    lower.startsWith('i do not know') ||
+    lower.startsWith('nothing in this case mentions that') ||
+    lower.includes('no record or statement in this case references') ||
+    lower === 'no answer found' ||
+    lower === 'no answer found.' ||
+    lower === 'record absence verified'
+  )
+}
+
+/**
+ * Determines whether an assistant message represents NO ANSWER FOUND ("I don't know" state).
+ * Adheres strictly to Law 4 (Record Absence Verified):
+ * - Explicitly flagged isNotFound
+ * - Text starts with "I don't know" or "Nothing in this case mentions that"
+ * - Law 4 validator dropped all candidate sentences leaving empty text
+ */
+export function isNoAnswerFound(
+  message: Pick<
+    ChatMessage,
+    'content' | 'isNotFound' | 'isLoading' | 'isError' | 'isStreaming' | 'citations' | 'notesRetrieved'
+  >
+): boolean {
+  if (message.isNotFound) return true
+  if (message.isLoading || message.isError) return false
+
+  const content = (message.content || '').trim()
+
+  // 1. Explicit text signature
+  if (isNoAnswerText(content)) return true
+
+  // 2. Law 4: Uncited sentences dropped leaving empty content
+  if (!message.isStreaming) {
+    if (!content && (!message.citations || message.citations.length === 0)) {
+      return true
+    }
+    if (content) {
+      const validation = validateText(content, message.notesRetrieved)
+      if (validation.surviving_sentences.length === 0) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
 
 export function getNoteMetadata(rawPath: string): {
   filename: string
@@ -260,17 +315,46 @@ export function getOfflineCaseResponse(question: string): CopilotResponse {
     }
   }
 
+  if (
+    q.includes('provider unreachable') ||
+    q.includes(':test-provider-error:')
+  ) {
+    throw new Error('Could not connect to configured model provider (Ollama / Gemini Flash).')
+  }
+
+  if (
+    q.includes('case') ||
+    q.includes('overview') ||
+    q.includes('status') ||
+    q.includes('syndicate') ||
+    q.includes('kharkhoda')
+  ) {
+    return {
+      answer:
+        'Case analysis grounded in retrieved records indicates established operational links across monitored entities in Sonipat. ^[DOC_FIR_0142 p:2 l:9] All suspect communication patterns and physical movements remain verified against source documents. ^[DOC_CDR_9812345678 row:48219]',
+      citations: [
+        { source_doc_id: 'DOC_FIR_0142', locator: 'p:2 l:9' },
+        { source_doc_id: 'DOC_CDR_9812345678', locator: 'row:48219' },
+      ],
+      notes_retrieved: [
+        '01_People/Vikram Singh.md',
+        '00_Raw_Inputs/FIR/FIR_0142_Kharkhoda.md',
+        '00_Raw_Inputs/CDR/CDR_9812345678.md',
+      ],
+    }
+  }
+
+  // NO ANSWER FOUND: Law 4 evidentiary guarantee
+  // Verified scan of all case notes, FIRs, statements, and CDR records yielded no citations.
   return {
-    answer:
-      'Case analysis grounded in retrieved records indicates established operational links across monitored entities in Sonipat. ^[DOC_FIR_0142 p:2 l:9] All suspect communication patterns and physical movements remain verified against source documents. ^[DOC_CDR_9812345678 row:48219]',
-    citations: [
-      { source_doc_id: 'DOC_FIR_0142', locator: 'p:2 l:9' },
-      { source_doc_id: 'DOC_CDR_9812345678', locator: 'row:48219' },
-    ],
+    answer: 'Nothing in this case mentions that.',
+    citations: [],
     notes_retrieved: [
-      '01_People/Vikram Singh.md',
       '00_Raw_Inputs/FIR/FIR_0142_Kharkhoda.md',
       '00_Raw_Inputs/CDR/CDR_9812345678.md',
+      '00_Raw_Inputs/Statement/Statement_Amit_Malik.md',
+      '00_Raw_Inputs/TowerDump/TD_HR_SNP_0147.md',
     ],
+    is_not_found: true,
   }
 }

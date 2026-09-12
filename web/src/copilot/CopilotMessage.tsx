@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import type { CopilotMessageProps } from './types'
-import { getNoteMetadata, renderContentWithCitations } from './utils'
+import { getNoteMetadata, renderContentWithCitations, isNoAnswerFound } from './utils'
 import { openFileAt } from './navigation'
+import { ErrorState, LoadingSkeleton } from '../states'
 
 export function CopilotMessage({
   message,
@@ -85,53 +86,52 @@ export function CopilotMessage({
 
       {/* Loading / Thinking State */}
       {message.isLoading && (
-        <div className="copilot-thinking">
+        <div className="copilot-thinking" role="status" aria-label="Thinking">
           <div className="copilot-thinking-dots" aria-hidden="true">
             <span className="copilot-thinking-dot" />
             <span className="copilot-thinking-dot" />
             <span className="copilot-thinking-dot" />
           </div>
-          <span>Retrieving case notes from _Case_Index.md...</span>
+          <span>Thinking... scanning _Case_Index.md</span>
+          <LoadingSkeleton variant="detail" lines={2} />
         </div>
       )}
 
-      {/* Error Box */}
+      {/* Error Box with ErrorState */}
       {message.isError && (
         <div className="copilot-error-box">
-          <div className="copilot-error-msg">
-            {message.errorMessage ||
-              message.content ||
-              'Failed to retrieve answer from Copilot service.'}
-          </div>
-          {onRetry && (
-            <button
-              type="button"
-              className="copilot-retry-btn"
-              onClick={() => onRetry(message.id)}
-            >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M23 4v6h-6" />
-                <path d="M1 20v-6h6" />
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-              </svg>
-              <span>Retry</span>
-            </button>
-          )}
+          <ErrorState
+            title={message.errorTitle || 'Model Provider Unreachable'}
+            message={message.errorMessage || message.content || 'Could not connect to model provider.'}
+            details={message.errorDetails || 'Ensure Ollama is running at http://127.0.0.1:11434 with model loaded, or switch to Gemini Flash in Case_Config.yaml.'}
+            retryAction={onRetry ? () => onRetry(message.id) : undefined}
+            retryLabel="Retry Question"
+          />
         </div>
       )}
 
-      {/* Message Content with Inline Citations */}
-      {!message.isLoading && !message.isError && (
+      {/* NO ANSWER FOUND ("I don't know" state per Law 4 & HER-T06) */}
+      {!message.isLoading && !message.isError && isNoAnswerFound(message) && (
+        <div className="copilot-no-answer-card" role="status" aria-label="No Answer Found">
+          <div className="copilot-no-answer-badge">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>Record Absence Verified (Law 4)</span>
+          </div>
+          <h4 className="copilot-no-answer-headline">
+            Nothing in this case mentions that
+          </h4>
+          <p className="copilot-no-answer-subtext">
+            A full scan of all case notes, FIRs, statements, and CDR records yielded no surviving citations for this query.
+          </p>
+        </div>
+      )}
+
+      {/* Message Content with Inline Citations (when answer is present and grounded) */}
+      {!message.isLoading && !message.isError && !isNoAnswerFound(message) && (
         <div className="copilot-bot-body">
           {renderContentWithCitations(
             message.content,

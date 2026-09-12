@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import './copilot.css'
 import { CopilotMessage } from './CopilotMessage'
+import { EmptyState, ErrorState } from '../states'
 import type {
   ChatMessage,
   CopilotPanelProps,
@@ -23,12 +24,16 @@ const SUGGESTED_PROMPTS = [
  */
 export function CopilotPanel({
   caseId = 'Case_01_Sonipat_Arms',
+  isCaseOpen = true,
+  isProviderUnreachable = false,
+  providerErrorDetails,
   initialMessages = [],
   messages: externalMessages,
   setMessages: externalSetMessages,
   onMessagesChange,
   onCitationClick,
   onNoteClick,
+  onRetryProvider,
   draft: externalDraft,
   setDraft: externalSetDraft,
   className,
@@ -148,7 +153,7 @@ export function CopilotPanel({
   const handleSend = useCallback(
     async (overrideQuestion?: string) => {
       const questionText = (overrideQuestion || draft).trim()
-      if (!questionText || isStreamingActive) return
+      if (!questionText || isStreamingActive || !caseId || !isCaseOpen) return
 
       updateDraft('')
 
@@ -180,7 +185,7 @@ export function CopilotPanel({
       try {
         const payload: CopilotRequest = {
           question: questionText,
-          case_id: caseId,
+          case_id: caseId ?? undefined,
         }
 
         const res = await fetch('/api/copilot/ask', {
@@ -199,7 +204,7 @@ export function CopilotPanel({
         streamResponse(botMsgId, { ...data, answer: sanitizedAnswer })
       } catch (err: unknown) {
         console.warn(
-          '[Copilot] Live /api/copilot/ask unavailable, using verified offline synthesizer:',
+          '[Copilot] Live /api/copilot/ask unavailable, checking offline synthesizer:',
           err
         )
 
@@ -210,7 +215,7 @@ export function CopilotPanel({
           const sanitizedAnswer = validation.surviving_text || offlineData.answer
           streamResponse(botMsgId, { ...offlineData, answer: sanitizedAnswer })
         } else {
-          // Graceful error state if no fallback is viable
+          // Provider unreachable / error state per HER-T06
           const errorMsg =
             err instanceof Error ? err.message : 'Network error contacting copilot engine.'
           updateMessages((prev) =>
@@ -221,7 +226,13 @@ export function CopilotPanel({
                     isLoading: false,
                     isStreaming: false,
                     isError: true,
-                    errorMessage: `${errorMsg}. Check backend server at http://127.0.0.1:8000.`,
+                    isProviderUnreachable: true,
+                    errorTitle: 'Model Provider Unreachable',
+                    errorMessage:
+                      'Could not connect to configured model provider (Ollama / Gemini Flash).',
+                    errorDetails:
+                      providerErrorDetails ||
+                      `${errorMsg}. Ensure Ollama is running at http://127.0.0.1:11434 with model loaded, or switch to Gemini Flash in Case_Config.yaml. The local provider is available offline.`,
                   }
                 : msg
             )
@@ -230,7 +241,7 @@ export function CopilotPanel({
         }
       }
     },
-    [draft, isStreamingActive, updateDraft, caseId, updateMessages, streamResponse]
+    [draft, isStreamingActive, updateDraft, caseId, isCaseOpen, providerErrorDetails, updateMessages, streamResponse]
   )
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -341,7 +352,23 @@ export function CopilotPanel({
 
       {/* Message Stream Log */}
       <div className="copilot-log" ref={logRef}>
-        {messages.length === 0 ? (
+        {!caseId || !isCaseOpen ? (
+          <EmptyState
+            headline="No Case Open"
+            body="Open a case vault to query the copilot against evidentiary documents and entity notes."
+          />
+        ) : isProviderUnreachable && messages.length === 0 ? (
+          <ErrorState
+            title="Model Provider Unreachable"
+            message="Could not connect to configured model provider (Ollama / Gemini Flash)."
+            details={
+              providerErrorDetails ||
+              'Ensure Ollama is running at http://127.0.0.1:11434 with model loaded, or switch to Gemini Flash in Case_Config.yaml. The local provider is available offline.'
+            }
+            retryAction={onRetryProvider}
+            retryLabel="Retry Provider"
+          />
+        ) : messages.length === 0 ? (
           <div className="copilot-empty">
             <div className="copilot-empty-icon" aria-hidden="true">
               <svg
@@ -410,15 +437,19 @@ export function CopilotPanel({
               className="copilot-textarea"
               rows={1}
               value={draft}
-              placeholder="Ask about suspects, CDR links, FIR records..."
+              placeholder={
+                !caseId || !isCaseOpen
+                  ? 'Open a case to query copilot...'
+                  : 'Ask about suspects, CDR links, FIR records...'
+              }
               onChange={(e) => updateDraft(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={isStreamingActive}
+              disabled={isStreamingActive || !caseId || !isCaseOpen}
             />
             <button
               type="submit"
               className="copilot-send-btn"
-              disabled={!draft.trim() || isStreamingActive}
+              disabled={!draft.trim() || isStreamingActive || !caseId || !isCaseOpen}
               title="Send message (Enter)"
               aria-label="Send message"
             >

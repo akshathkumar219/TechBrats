@@ -27,6 +27,7 @@ export interface CopilotResponse {
   answer: string
   citations: CitationItem[]
   notes_retrieved: string[]
+  is_not_found?: boolean
 }
 
 export interface ChatMessage {
@@ -38,7 +39,11 @@ export interface ChatMessage {
   isStreaming?: boolean
   isLoading?: boolean
   isError?: boolean
+  isProviderUnreachable?: boolean
+  isNotFound?: boolean
+  errorTitle?: string
   errorMessage?: string
+  errorDetails?: string
   timestamp?: string
 }
 
@@ -63,13 +68,17 @@ export interface CopilotMessageProps {
 }
 
 export interface CopilotPanelProps {
-  caseId?: string
+  caseId?: string | null
+  isCaseOpen?: boolean
+  isProviderUnreachable?: boolean
+  providerErrorDetails?: string
   initialMessages?: ChatMessage[]
   messages?: ChatMessage[]
   setMessages?: React.Dispatch<React.SetStateAction<ChatMessage[]>>
   onMessagesChange?: (messages: ChatMessage[]) => void
   onCitationClick?: (source: string, locator?: string | null) => void
   onNoteClick?: (notePath: string) => void
+  onRetryProvider?: () => void
   draft?: string
   setDraft?: (draft: string) => void
   className?: string
