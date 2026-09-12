@@ -3,3 +3,16 @@ node_modules
 dist
 dist-ssr
 *.local
+
+# private lead notes
+docs/tasks/LEAD_NOTES.md
+
+__pycache__/
+.venv/
+*.duckdb
+vaults/
+.obsidian/
+*.pptx
+slide_img/
+rendered_slides/
+storm-reports/
