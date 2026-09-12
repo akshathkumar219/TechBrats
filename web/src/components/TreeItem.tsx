@@ -21,17 +21,18 @@ export function TreeItem({
   const isSelected = !node.isFolder && selectedPath === node.path
 
   if (node.isFolder) {
+    const icon = node.icon || '📁'
     return (
       <div className="tree-branch">
         <div
-          className="tree-row"
+          className={`tree-row tree-folder-row ${node.isLocked ? 'is-locked-folder' : ''}`}
           style={{ paddingLeft: `${depth * 14 + 6}px` }}
           onClick={() => onToggleFolder(node.path)}
           role="button"
           tabIndex={0}
         >
           <span className={`tree-chevron ${isCollapsed ? '' : 'open'}`}>▶</span>
-          <span className="tree-icon">📁</span>
+          <span className="tree-icon" aria-hidden="true">{icon}</span>
           <span className="tree-label">{node.displayName}</span>
           <span className="tree-folder-count">{node.children.length}</span>
         </div>
@@ -54,17 +55,24 @@ export function TreeItem({
     )
   }
 
+  const icon = node.icon || '📄'
   return (
     <div
-      className={`tree-row ${isSelected ? 'active' : ''}`}
+      className={`tree-row tree-file-row ${isSelected ? 'active' : ''} ${node.isLocked ? 'is-locked-file' : ''}`}
       style={{ paddingLeft: `${depth * 14 + 20}px` }}
       onClick={() => onSelectFile(node.path)}
       title={node.path}
       role="button"
       tabIndex={0}
     >
-      <span className="tree-icon">📄</span>
+      <span className="tree-icon" aria-hidden="true">{icon}</span>
       <span className="tree-label">{node.displayName}</span>
+      {node.role && (
+        <span className={`role-badge role-${node.role}`} title={`Role: ${node.role}`}>
+          {node.role}
+        </span>
+      )}
     </div>
   )
 }
+

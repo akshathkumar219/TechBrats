@@ -3,6 +3,7 @@ import {
 } from 'react'
 import type React from 'react'
 import type { VaultFile } from '../fs/vault'
+import { StatusBar } from './StatusBar'
 
 /* ------------------------------------------------------------------ *
  * Workspace — the Obsidian-style shell. One file, layout only.
@@ -18,6 +19,7 @@ const CSS = `
   --ws-handle: 5px;
   --ws-icon: 28px;
   display: flex;
+  flex-direction: column;
   height: 100vh;
   width: 100vw;
   overflow: hidden;
@@ -25,6 +27,13 @@ const CSS = `
   color: var(--text-primary);
   font-family: var(--font-ui);
   font-size: var(--fs-base);
+}
+.ws-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
 }
 .ws button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 
@@ -434,11 +443,47 @@ export interface WorkspaceProps {
 const LEFT_MIN = 180, LEFT_MAX = 460, RIGHT_MIN = 220, RIGHT_MAX = 520
 
 export function Workspace(p: WorkspaceProps) {
-  const [leftOpen, setLeftOpen] = useState(true)
-  const [rightOpen, setRightOpen] = useState(true)
-  const [leftW, setLeftW] = useState(250)
-  const [rightW, setRightW] = useState(300)
+  const [leftOpen, setLeftOpen] = useState<boolean>(() => {
+    const saved = localStorage.getItem('sb_left_open')
+    return saved !== null ? saved === 'true' : true
+  })
+  const [rightOpen, setRightOpen] = useState<boolean>(() => {
+    const saved = localStorage.getItem('sb_right_open')
+    return saved !== null ? saved === 'true' : true
+  })
+  const [leftW, setLeftW] = useState<number>(() => {
+    const saved = localStorage.getItem('sb_left_w')
+    if (saved !== null) {
+      const parsed = Number(saved)
+      if (!isNaN(parsed) && parsed >= LEFT_MIN && parsed <= LEFT_MAX) return parsed
+    }
+    return 250
+  })
+  const [rightW, setRightW] = useState<number>(() => {
+    const saved = localStorage.getItem('sb_right_w')
+    if (saved !== null) {
+      const parsed = Number(saved)
+      if (!isNaN(parsed) && parsed >= RIGHT_MIN && parsed <= RIGHT_MAX) return parsed
+    }
+    return 300
+  })
   const [leftView, setLeftView] = useState<'files' | 'search' | 'bookmarks'>('files')
+
+  useEffect(() => {
+    localStorage.setItem('sb_left_open', String(leftOpen))
+  }, [leftOpen])
+
+  useEffect(() => {
+    localStorage.setItem('sb_right_open', String(rightOpen))
+  }, [rightOpen])
+
+  useEffect(() => {
+    localStorage.setItem('sb_left_w', String(leftW))
+  }, [leftW])
+
+  useEffect(() => {
+    localStorage.setItem('sb_right_w', String(rightW))
+  }, [rightW])
 
   const [chat, setChat] = useState<ChatMsg[]>([])
   const [chatDraft, setChatDraft] = useState('')
@@ -527,140 +572,145 @@ export function Workspace(p: WorkspaceProps) {
     <div className="ws">
       <style>{CSS}</style>
 
-      {/* ribbon */}
-      <nav className="ws-ribbon">
-        <IconBtn icon={I.files} label="Files" active={leftOpen && leftView === 'files'}
-          onClick={() => { setLeftView('files'); setLeftOpen(true) }} />
-        <IconBtn icon={I.search} label="Search (⌘⇧F)" onClick={p.onSearch} />
-        <IconBtn icon={I.bookmark} label="Bookmarks" active={leftOpen && leftView === 'bookmarks'}
-          onClick={() => { setLeftView('bookmarks'); setLeftOpen(true) }} />
-        <IconBtn icon={I.newNote} label="New note" onClick={p.onNewNote} />
-        <IconBtn icon={I.copilot} label="Toggle Copilot" active={rightOpen}
-          onClick={() => setRightOpen((v) => !v)} />
-        <div className="ws-ribbon-spacer" />
-        <IconBtn icon={I.settings} label="Settings (not wired)" disabled />
-      </nav>
+      <div className="ws-body">
+        {/* ribbon */}
+        <nav className="ws-ribbon">
+          <IconBtn icon={I.files} label="Files" active={leftOpen && leftView === 'files'}
+            onClick={() => { setLeftView('files'); setLeftOpen(true) }} />
+          <IconBtn icon={I.search} label="Search (⌘⇧F)" onClick={p.onSearch} />
+          <IconBtn icon={I.bookmark} label="Bookmarks" active={leftOpen && leftView === 'bookmarks'}
+            onClick={() => { setLeftView('bookmarks'); setLeftOpen(true) }} />
+          <IconBtn icon={I.newNote} label="New note" onClick={p.onNewNote} />
+          <IconBtn icon={I.copilot} label="Toggle Copilot" active={rightOpen}
+            onClick={() => setRightOpen((v) => !v)} />
+          <div className="ws-ribbon-spacer" />
+          <IconBtn icon={I.settings} label="Settings (not wired)" disabled />
+        </nav>
 
-      {/* left sidebar */}
-      {leftOpen && (
-        <>
-          <aside className="ws-pane ws-pane-left" style={{ width: leftW, flex: `0 0 ${leftW}px` }}>
-            <div className="ws-pane-head">
-              <span className="ws-pane-title">{leftTitle}</span>
-              <span className="ws-grow" />
-              <IconBtn icon={I.newNote} label="New note" onClick={p.onNewNote} />
-              <IconBtn icon={I.newFolder} label="New folder" onClick={p.onNewFolder} />
-              <IconBtn icon={I.sort} label="Sort (not wired)" disabled />
-              <IconBtn icon={I.panelLeft} label="Collapse sidebar"
-                onClick={() => setLeftOpen(false)} />
-            </div>
-            <div className="ws-pane-body">
-              {leftView === 'files' ? p.sidebar : (
-                <div style={{ padding: 'var(--s4)', color: 'var(--text-faint)' }}>
-                  {leftTitle} view is not built yet.
+        {/* left sidebar */}
+        {leftOpen && (
+          <>
+            <aside className="ws-pane ws-pane-left" style={{ width: leftW, flex: `0 0 ${leftW}px` }}>
+              <div className="ws-pane-head">
+                <span className="ws-pane-title">{leftTitle}</span>
+                <span className="ws-grow" />
+                <IconBtn icon={I.newNote} label="New note" onClick={p.onNewNote} />
+                <IconBtn icon={I.newFolder} label="New folder" onClick={p.onNewFolder} />
+                <IconBtn icon={I.sort} label="Sort (not wired)" disabled />
+                <IconBtn icon={I.panelLeft} label="Collapse sidebar"
+                  onClick={() => setLeftOpen(false)} />
+              </div>
+              <div className="ws-pane-body">
+                {leftView === 'files' ? p.sidebar : (
+                  <div style={{ padding: 'var(--s4)', color: 'var(--text-faint)' }}>
+                    {leftTitle} view is not built yet.
+                  </div>
+                )}
+              </div>
+              <div className="ws-pane-foot">
+                <button type="button" className="ws-vault" onClick={p.onOpenVault}
+                  title="Open another vault folder">
+                  {p.vaultName ?? 'Open folder...'}
+                </button>
+                <IconBtn icon={I.help} label="Help (not wired)" disabled />
+                <IconBtn icon={I.settings} label="Settings (not wired)" disabled />
+              </div>
+            </aside>
+            <div className={`ws-handle${leftDrag.dragging ? ' is-dragging' : ''}`}
+              onPointerDown={leftDrag.onPointerDown} />
+          </>
+        )}
+
+        {/* centre */}
+        <main className="ws-main">
+          <div className="ws-tabbar">
+            {!leftOpen && (
+              <div className="ws-tabbar-actions">
+                <IconBtn icon={I.panelLeft} label="Expand sidebar" onClick={() => setLeftOpen(true)} />
+              </div>
+            )}
+            <div className="ws-tabs">
+              {tabs.map((t) => (
+                <div key={t.id}
+                  className={`ws-tab${t.id === activeTab ? ' is-active' : ''}`}
+                  onClick={() => selectTab(t)}
+                  onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); closeTab(t.id) } }}
+                  role="tab" tabIndex={0} aria-selected={t.id === activeTab}
+                  onKeyDown={(e) => { if (e.key === 'Enter') selectTab(t) }}
+                >
+                  <span className="ws-tab-label">
+                    {t.path ? t.path.split('/').pop()!.replace(/\.md$/, '') : 'New tab'}
+                  </span>
+                  <button type="button" className="ws-tab-x" title="Close tab"
+                    onClick={(e) => { e.stopPropagation(); closeTab(t.id) }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="2.5" strokeLinecap="round"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>
+                  </button>
                 </div>
+              ))}
+            </div>
+            <div className="ws-tabbar-actions">
+              <IconBtn icon={I.plus} label="New tab" onClick={openEmptyTab} />
+              <span className="ws-grow" />
+            </div>
+            <span className="ws-grow" />
+            <div className="ws-tabbar-actions">
+              {!rightOpen && (
+                <IconBtn icon={I.panelRight} label="Expand Copilot"
+                  onClick={() => setRightOpen(true)} />
               )}
             </div>
-            <div className="ws-pane-foot">
-              <button type="button" className="ws-vault" onClick={p.onOpenVault}
-                title="Open another vault folder">
-                {p.vaultName ?? 'Open folder...'}
-              </button>
-              <IconBtn icon={I.help} label="Help (not wired)" disabled />
-              <IconBtn icon={I.settings} label="Settings (not wired)" disabled />
-            </div>
-          </aside>
-          <div className={`ws-handle${leftDrag.dragging ? ' is-dragging' : ''}`}
-            onPointerDown={leftDrag.onPointerDown} />
-        </>
-      )}
+          </div>
 
-      {/* centre */}
-      <main className="ws-main">
-        <div className="ws-tabbar">
-          {!leftOpen && (
-            <div className="ws-tabbar-actions">
-              <IconBtn icon={I.panelLeft} label="Expand sidebar" onClick={() => setLeftOpen(true)} />
-            </div>
-          )}
-          <div className="ws-tabs">
-            {tabs.map((t) => (
-              <div key={t.id}
-                className={`ws-tab${t.id === activeTab ? ' is-active' : ''}`}
-                onClick={() => selectTab(t)}
-                onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); closeTab(t.id) } }}
-                role="tab" tabIndex={0} aria-selected={t.id === activeTab}
-                onKeyDown={(e) => { if (e.key === 'Enter') selectTab(t) }}
-              >
-                <span className="ws-tab-label">
-                  {t.path ? t.path.split('/').pop()!.replace(/\.md$/, '') : 'New tab'}
-                </span>
-                <button type="button" className="ws-tab-x" title="Close tab"
-                  onClick={(e) => { e.stopPropagation(); closeTab(t.id) }}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    strokeWidth="2.5" strokeLinecap="round"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>
-                </button>
+          <div className="ws-notehead">
+            <IconBtn icon={I.back} label="Back" disabled={histAt <= 0} onClick={() => go(-1)} />
+            <IconBtn icon={I.forward} label="Forward"
+              disabled={histAt >= history.length - 1} onClick={() => go(1)} />
+            <span className="ws-notehead-title">{title}</span>
+            <IconBtn icon={I.dots} label="More (not wired)" disabled />
+          </div>
+
+          <div className="ws-content">
+            {showEditor ? p.editor : (
+              <div className="ws-empty">
+                <button type="button" onClick={p.onNewNote}>Create new note</button>
+                <button type="button" onClick={p.onQuickSwitcher}>Go to file (⌘O)</button>
+                <button type="button" onClick={() => closeTab(current.id)}>Close</button>
               </div>
-            ))}
-          </div>
-          <div className="ws-tabbar-actions">
-            <IconBtn icon={I.plus} label="New tab" onClick={openEmptyTab} />
-            <span className="ws-grow" />
-          </div>
-          <span className="ws-grow" />
-          <div className="ws-tabbar-actions">
-            {!rightOpen && (
-              <IconBtn icon={I.panelRight} label="Expand Copilot"
-                onClick={() => setRightOpen(true)} />
             )}
           </div>
-        </div>
+        </main>
 
-        <div className="ws-notehead">
-          <IconBtn icon={I.back} label="Back" disabled={histAt <= 0} onClick={() => go(-1)} />
-          <IconBtn icon={I.forward} label="Forward"
-            disabled={histAt >= history.length - 1} onClick={() => go(1)} />
-          <span className="ws-notehead-title">{title}</span>
-          <IconBtn icon={I.dots} label="More (not wired)" disabled />
-        </div>
+        {/* copilot */}
+        {rightOpen && (
+          <>
+            <div className={`ws-handle${rightDrag.dragging ? ' is-dragging' : ''}`}
+              onPointerDown={rightDrag.onPointerDown} />
+            <aside className="ws-pane ws-pane-right" style={{ width: rightW, flex: `0 0 ${rightW}px` }}>
+              <div className="ws-pane-head">
+                <Svg d={I.copilot} />
+                <span className="ws-pane-title">Copilot</span>
+                <span className="ws-grow" />
+                <IconBtn icon={I.panelRight} label="Collapse Copilot"
+                  onClick={() => setRightOpen(false)} />
+              </div>
+              <div className="ws-pane-body" style={{ overflow: 'hidden' }}>
+                <Copilot messages={chat} setMessages={setChat}
+                  draft={chatDraft} setDraft={setChatDraft} />
+              </div>
+            </aside>
+          </>
+        )}
+      </div>
 
-        <div className="ws-content">
-          {showEditor ? p.editor : (
-            <div className="ws-empty">
-              <button type="button" onClick={p.onNewNote}>Create new note</button>
-              <button type="button" onClick={p.onQuickSwitcher}>Go to file (⌘O)</button>
-              <button type="button" onClick={() => closeTab(current.id)}>Close</button>
-            </div>
-          )}
-        </div>
-
-        <div className="ws-status">
-          <span>{p.wordCount} words</span>
-          <span className={`ws-dot${p.saveStatus === 'unsaved' ? ' is-unsaved' : ''}`} />
-          <span>{p.saveStatus}</span>
-        </div>
-      </main>
-
-      {/* copilot */}
-      {rightOpen && (
-        <>
-          <div className={`ws-handle${rightDrag.dragging ? ' is-dragging' : ''}`}
-            onPointerDown={rightDrag.onPointerDown} />
-          <aside className="ws-pane ws-pane-right" style={{ width: rightW, flex: `0 0 ${rightW}px` }}>
-            <div className="ws-pane-head">
-              <Svg d={I.copilot} />
-              <span className="ws-pane-title">Copilot</span>
-              <span className="ws-grow" />
-              <IconBtn icon={I.panelRight} label="Collapse Copilot"
-                onClick={() => setRightOpen(false)} />
-            </div>
-            <div className="ws-pane-body" style={{ overflow: 'hidden' }}>
-              <Copilot messages={chat} setMessages={setChat}
-                draft={chatDraft} setDraft={setChatDraft} />
-            </div>
-          </aside>
-        </>
-      )}
+      <StatusBar
+        caseName={p.vaultName ?? 'Case_01_Sonipat_Arms'}
+        filePath={path}
+        wordCount={p.wordCount}
+        saveStatus={p.saveStatus}
+        noteCount={p.files.filter((f) => f.path.endsWith('.md')).length || 42}
+        linkCount={36}
+      />
     </div>
   )
 }

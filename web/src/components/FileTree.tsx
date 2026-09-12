@@ -8,6 +8,7 @@ interface FileTreeProps {
   folders?: string[]
   selectedPath: string | null
   reopenCandidateName?: string | null
+  noteContents?: Record<string, string>
   onSelectFile: (path: string) => void
   onReopenVault?: () => void
   isLoading: boolean
@@ -19,6 +20,7 @@ export function FileTree({
   folders = [],
   selectedPath,
   reopenCandidateName,
+  noteContents,
   onSelectFile,
   onReopenVault,
   isLoading,
@@ -26,7 +28,10 @@ export function FileTree({
 }: FileTreeProps) {
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
 
-  const tree = useMemo(() => buildFileTree(files, folders), [files, folders])
+  const tree = useMemo(
+    () => buildFileTree(files, folders, noteContents),
+    [files, folders, noteContents]
+  )
 
   const handleToggleFolder = (folderPath: string) => {
     setCollapsedPaths((prev) => {
@@ -46,12 +51,12 @@ export function FileTree({
         <input
           type="text"
           className="input-search"
-          placeholder="Search notes..."
-          disabled={files.length === 0}
+          placeholder="Search case notes..."
+          disabled={tree.length === 0}
         />
       </div>
       <div className="panel-header">
-        <span>Files {files.length > 0 ? `(${files.length})` : ''}</span>
+        <span>Cases &amp; Vault {files.length > 0 ? `(${files.length} files)` : '(Demo Cases)'}</span>
       </div>
 
       {error && (
@@ -62,7 +67,7 @@ export function FileTree({
 
       {isLoading ? (
         <div className="placeholder-content">
-          <p>Scanning files...</p>
+          <p>Scanning case vault...</p>
         </div>
       ) : tree.length === 0 ? (
         <div className="placeholder-content">
@@ -100,3 +105,4 @@ export function FileTree({
     </aside>
   )
 }
+
