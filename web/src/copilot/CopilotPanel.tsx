@@ -8,6 +8,7 @@ import type {
   CopilotResponse,
 } from './types'
 import { getOfflineCaseResponse } from './utils'
+import { validateText } from './validator'
 
 const SUGGESTED_PROMPTS = [
   'Who is Vikram Singh?',
@@ -193,7 +194,9 @@ export function CopilotPanel({
         }
 
         const data: CopilotResponse = await res.json()
-        streamResponse(botMsgId, data)
+        const validation = validateText(data.answer, data.notes_retrieved)
+        const sanitizedAnswer = validation.surviving_text || data.answer
+        streamResponse(botMsgId, { ...data, answer: sanitizedAnswer })
       } catch (err: unknown) {
         console.warn(
           '[Copilot] Live /api/copilot/ask unavailable, using verified offline synthesizer:',
@@ -203,8 +206,9 @@ export function CopilotPanel({
         // Seamless fallback to grounded offline case memory for SIH venue offline conditions
         const offlineData = getOfflineCaseResponse(questionText)
         if (offlineData) {
-          // Stream the verified offline response
-          streamResponse(botMsgId, offlineData)
+          const validation = validateText(offlineData.answer, offlineData.notes_retrieved)
+          const sanitizedAnswer = validation.surviving_text || offlineData.answer
+          streamResponse(botMsgId, { ...offlineData, answer: sanitizedAnswer })
         } else {
           // Graceful error state if no fallback is viable
           const errorMsg =

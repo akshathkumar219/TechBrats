@@ -1,8 +1,13 @@
 import React from 'react'
 import { CitationChip } from './CitationChip'
 import type { CopilotResponse } from './types'
+import {
+  CITATION_REGEX,
+  sentenceHasCitation,
+  splitIntoSentences,
+} from './validator'
 
-export const CITATION_REGEX = /\^\[\s*([^\s\]]+)(?:\s+([^\]]+))?\s*\]/g
+export { CITATION_REGEX }
 
 export function getNoteMetadata(rawPath: string): {
   filename: string
@@ -48,60 +53,121 @@ export function getNoteMetadata(rawPath: string): {
   return { filename, entityType: 'Evidence', badgeColorVar: 'var(--text-muted)' }
 }
 
+/**
+ * renderContentWithCitations — Renders answer paragraphs and inline citation chips.
+ * Under Case Model Law 4: Any sentence lacking a resolvable citation is dropped before render.
+ */
 export function renderContentWithCitations(
   text: string,
   isStreaming?: boolean,
-  onCitationClick?: (source: string, locator?: string | null) => void
+  onCitationClick?: (source: string, locator?: string | null) => void,
+  validSources?: string[] | Set<string>
 ): React.ReactNode[] {
-  if (!text) return []
+  if (!text || !text.trim()) return []
 
   const paragraphs = text.split(/\n\n+/)
+  const renderedParagraphs: React.ReactNode[] = []
 
-  return paragraphs.map((para, pIdx) => {
+  paragraphs.forEach((para, pIdx) => {
     const isLastParagraph = pIdx === paragraphs.length - 1
-    const segments: React.ReactNode[] = []
-    let lastIndex = 0
-    let match: RegExpExecArray | null
-    const regex = new RegExp(CITATION_REGEX.source, 'g')
+    const sentences = splitIntoSentences(para)
+    if (sentences.length === 0) return
 
-    while ((match = regex.exec(para)) !== null) {
-      const matchIndex = match.index
-      if (matchIndex > lastIndex) {
-        segments.push(para.slice(lastIndex, matchIndex))
+    // Filter sentences under Law 4: drop any uncited sentence
+    const survivingSentenceElements: React.ReactNode[] = []
+
+    sentences.forEach((sentence, sIdx) => {
+      const isLastSentence = sIdx === sentences.length - 1
+      const isActivelyStreaming = isStreaming && isLastParagraph && isLastSentence
+      const isCited = sentenceHasCitation(sentence, validSources)
+
+      // An uncited sentence is DROPPED BEFORE RENDER unless actively streaming in-flight text
+      if (!isCited && !isActivelyStreaming) {
+        return
       }
-      const source = match[1]
-      const locator = match[2]?.trim() || null
-      segments.push(
-        React.createElement(CitationChip, {
-          key: `chip-${pIdx}-${matchIndex}-${source}`,
-          source,
-          locator,
-          onClick: onCitationClick,
-        })
+
+      // Convert ^[source locator] into inline CitationChip
+      const segments: React.ReactNode[] = []
+      let lastIndex = 0
+      let match: RegExpExecArray | null
+      const regex = new RegExp(CITATION_REGEX.source, 'g')
+
+      while ((match = regex.exec(sentence)) !== null) {
+        const matchIndex = match.index
+        if (matchIndex > lastIndex) {
+          segments.push(sentence.slice(lastIndex, matchIndex))
+        }
+        const source = match[1]?.trim() || ''
+        const locator = match[2]?.trim() || null
+
+        segments.push(
+          React.createElement(CitationChip, {
+            key: `chip-${pIdx}-${sIdx}-${matchIndex}-${source}`,
+            source,
+            locator,
+            retrievedNotes: Array.isArray(validSources) ? validSources : undefined,
+            onClick: onCitationClick,
+            inline: true,
+          })
+        )
+        lastIndex = matchIndex + match[0].length
+      }
+
+      if (lastIndex < sentence.length) {
+        segments.push(sentence.slice(lastIndex))
+      }
+
+      if (isActivelyStreaming) {
+        segments.push(
+          React.createElement('span', {
+            key: 'cursor',
+            className: 'copilot-cursor',
+            'aria-hidden': 'true',
+          })
+        )
+      }
+
+      survivingSentenceElements.push(
+        React.createElement(
+          'span',
+          { key: `s-${pIdx}-${sIdx}`, className: 'copilot-sentence' },
+          ...segments,
+          sIdx < sentences.length - 1 ? ' ' : ''
+        )
       )
-      lastIndex = matchIndex + match[0].length
-    }
+    })
 
-    if (lastIndex < para.length) {
-      segments.push(para.slice(lastIndex))
-    }
-
-    if (isStreaming && isLastParagraph) {
-      segments.push(
-        React.createElement('span', {
-          key: 'cursor',
-          className: 'copilot-cursor',
-          'aria-hidden': 'true',
-        })
+    if (survivingSentenceElements.length > 0) {
+      renderedParagraphs.push(
+        React.createElement(
+          'p',
+          { key: `p-${pIdx}`, className: 'copilot-paragraph' },
+          ...survivingSentenceElements
+        )
       )
     }
-
-    return React.createElement(
-      'p',
-      { key: `p-${pIdx}`, className: 'copilot-paragraph' },
-      ...segments
-    )
   })
+
+  if (renderedParagraphs.length === 0) {
+    return [
+      React.createElement(
+        'div',
+        { key: 'law4-dropped-notice', className: 'copilot-uncited-notice' },
+        React.createElement(
+          'span',
+          { className: 'copilot-uncited-badge' },
+          'Law 4 Filter'
+        ),
+        React.createElement(
+          'span',
+          { className: 'copilot-uncited-text' },
+          'All claims in this response lacked verifiable source citations and were dropped before render.'
+        )
+      ),
+    ]
+  }
+
+  return renderedParagraphs
 }
 
 /**

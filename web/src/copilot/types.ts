@@ -43,10 +43,16 @@ export interface ChatMessage {
 }
 
 export interface CitationChipProps {
-  source: string
+  source?: string
   locator?: string | null
+  path?: string
+  line?: number
+  span?: [number, number]
+  citation?: CitationItem
+  retrievedNotes?: string[]
   onClick?: (source: string, locator?: string | null) => void
   className?: string
+  inline?: boolean
 }
 
 export interface CopilotMessageProps {

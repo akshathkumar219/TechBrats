@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import type { CopilotMessageProps } from './types'
 import { getNoteMetadata, renderContentWithCitations } from './utils'
+import { openFileAt } from './navigation'
 
 export function CopilotMessage({
   message,
@@ -135,7 +136,8 @@ export function CopilotMessage({
           {renderContentWithCitations(
             message.content,
             message.isStreaming,
-            onCitationClick
+            onCitationClick,
+            retrievedNotes
           )}
         </div>
       )}
@@ -167,6 +169,7 @@ export function CopilotMessage({
                     key={notePath}
                     className="copilot-retrieved-item"
                     onClick={() => {
+                      openFileAt(notePath, 1)
                       onNoteClick?.(notePath)
                       onCitationClick?.(notePath, null)
                     }}
