@@ -1,12 +1,23 @@
 """
-Pydantic v2 schemas for SyndicateBrain.
+Pydantic v2 schemas for SyndicateBrain (SIH26189).
 
-Law 1: Evidence is immutable.
-Law 3: Every edge carries provenance.
+THE SIX LAWS:
+1. Evidence is immutable (00_Raw_Inputs/ files hashed, locked, verified).
+2. The map is deterministic; the AI only proposes (record-derived vs AI-proposed).
+3. Every link carries its reason and citation (source_doc_id + locator required).
+4. Nothing is asserted without a citation (uncited sentences dropped by validator).
+5. The case is temporal (notes and links carry timestamps/dates).
+6. Identity is resolved conservatively (hard signals only).
 
-CRITICAL: Edge MUST carry source_doc_id: str and locator: str as required
-fields with NO default and NO Optional. An edge without provenance must be
-impossible to construct.
+LOCATOR FORMAT:
+Locator format is strictly fixed:
+- Documents / FIRs / Statements: "p:3 l:11" (page and line)
+- CDR / Call Detail Records: "row:48219" (stable row index)
+
+CRITICAL INVARIANT:
+Link and Proposal each carry a Citation as a strictly required field:
+no default, not Optional. Citation carries source_doc_id: str and locator: str,
+both strictly required. A link or proposal without a source must be impossible to construct.
 """
 
 from typing import Any, Optional
@@ -14,190 +25,201 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class Doc(BaseModel):
-    """Represents an ingested evidentiary document in 01_Evidence_Inbox/."""
+    """Represents an ingested evidentiary document in 00_Raw_Inputs/."""
     model_config = ConfigDict(extra="allow")
 
     id: str
-    path: str
-    kind: str  # FIR | CDR | TowerDump | Statement | FieldLog | Misc
+    filename: str
+    type: str  # FIR | CDR | TowerDump | Statement | FieldLog | Misc
     sha256: str
-    bytes: int
-    ingested_at: str
-    ingested_by: str
+    ingest_timestamp: str
+    original_path: str
+    locked: bool = True
+    bytes: Optional[int] = None
     page_count: Optional[int] = None
 
 
-class Provenance(BaseModel):
+class Citation(BaseModel):
     """
-    Provenance record for an edge or claim.
+    Provenance record for an edge, link, claim, or proposal.
     Points to a verified source document and exact locator.
+    Strictly requires source_doc_id and locator (no defaults, not Optional).
     """
     model_config = ConfigDict(extra="allow")
 
     source_doc_id: str
-    locator: str  # e.g. 'page:3 line:11' or 'row:4182'
-    observed_at: Optional[str] = None
-    weight: float = 1.0
-    tier: str = "deterministic"  # 'deterministic' | 'hypothesis'
+    locator: str  # Fixed format: 'p:3 l:11' for docs, 'row:48219' for CDR
     snippet: Optional[str] = None
-    cypher: Optional[str] = None
-    sql: Optional[str] = None
-    derivation_chain: Optional[str] = None
-    doc: Optional[Doc] = None
+    observed_at: Optional[str] = None
+    tier: str = "deterministic"
 
 
-class Edge(BaseModel):
+class Link(BaseModel):
     """
-    Graph relationship between two entities.
-
-    NON-NEGOTIABLE CONSTRAINT:
-    Edge MUST carry source_doc_id: str and locator: str with NO default
-    and NO Optional. A provenance-less edge is unrepresentable.
+    Link between entities in the knowledge graph / markdown notes.
+    CRITICAL: citation is strictly required — no default, not Optional.
+    A link without a source cannot be constructed.
     """
     model_config = ConfigDict(extra="allow")
 
-    id: str
     source: str
     target: str
-    type: str  # CALLED | SMS_TO | USES_PHONE | USES_DEVICE | PINGED | NAMED_IN | CO_ACCUSED | OWNS_VEHICLE | PRESENT_AT | MEMBER_OF | MENTIONS
-    source_doc_id: str
-    locator: str
+    reason: str
+    citation: Citation
+    tier: str = "record-derived"  # 'record-derived' | 'ai-proposed'
+    is_ai: bool = False
+    ai_marker: Optional[str] = None  # e.g. "<!-- ai:prop_0007 accepted -->"
+    confidence: Optional[float] = None
     observed_at: Optional[str] = None
-    weight: float = 1.0
-    tier: str = "deterministic"
     properties: dict[str, Any] = Field(default_factory=dict)
 
 
-class Node(BaseModel):
-    """Entity node in the knowledge graph."""
-    model_config = ConfigDict(extra="allow")
-
-    id: str
-    type: str  # Person | Phone | Device | Vehicle | Tower | Location | Org | FIR | Event | Doc
-    label: str
-    canonical_name: Optional[str] = None
-    aliases: list[str] = Field(default_factory=list)
-    thana: Optional[str] = None
-    first_seen: Optional[str] = None
-    last_seen: Optional[str] = None
-    note_path: Optional[str] = None
-    degree: Optional[int] = None
-    pagerank: Optional[float] = None
-    betweenness: Optional[float] = None
-    community: Optional[str] = None
-    properties: dict[str, Any] = Field(default_factory=dict)
-
-
-class SubgraphResponse(BaseModel):
-    """Response payload for subgraph queries."""
-    model_config = ConfigDict(extra="allow")
-
-    nodes: list[Node]
-    edges: list[Edge]
-    case_id: Optional[str] = None
-    center: Optional[str] = None
-    depth: Optional[int] = None
-
-
-class CertificateRequest(BaseModel):
-    """Request payload for generating a BSA §63 certificate."""
-    model_config = ConfigDict(extra="allow")
-
-    case_id: str
-    subgraph_nodes: list[str] = Field(default_factory=list)
-    subgraph_edges: list[str] = Field(default_factory=list)
-    officer_name: str = "IO Rajesh Kumar"
-    officer_badge: Optional[str] = None
-    notes: Optional[str] = None
-
-
-class ResolveDecision(BaseModel):
+class Proposal(BaseModel):
     """
-    Logged entity resolution decision. Reversible per Law 1.
+    AI-proposed link or lead awaiting human acceptance.
+    CRITICAL: citation is strictly required — no default, not Optional.
     """
     model_config = ConfigDict(extra="allow")
 
-    id: Optional[int] = None
-    left_id: str
-    right_id: str
-    block_key: str
-    phonetic_score: float
-    vector_score: float = 0.0
-    context_score: float = 0.0
-    combined: float
-    decision: str  # auto_merge | auto_reject | pending | human_merge | human_reject | needs_review
-    decided_by: str = "system"
+    id: str  # e.g. "prop_0001"
+    claim: str
+    reason: str
+    citation: Citation
+    confidence: float
+    source_entity: Optional[str] = None
+    target_entity: Optional[str] = None
+    status: str = "proposed"  # 'proposed' | 'accepted' | 'rejected'
+    created_at: Optional[str] = None
     decided_at: Optional[str] = None
-    reason: Optional[str] = None
-    derivation_chain: Optional[str] = None
-    reverted_at: Optional[str] = None
+    decided_by: Optional[str] = None
 
 
-class AgentCard(BaseModel):
-    """Frontmatter + content card generated by Cartographer / AI agents."""
+class FileUpdateProposal(BaseModel):
+    """
+    Suggested additions for notes that may be out of date.
+    Read-only suggestions; AI never edits note bodies directly.
+    """
     model_config = ConfigDict(extra="allow")
 
-    entity_id: str
-    type: str = "suspect"  # suspect | organisation | phone | vehicle | location | event | hypothesis
-    canonical_name: str
-    aliases: list[str] = Field(default_factory=list)
-    thana: Optional[str] = None
-    status: str = "active"  # active | arrested | absconding | cleared
-    risk_flags: list[str] = Field(default_factory=list)
-    communities: list[str] = Field(default_factory=list)
-    degree: Optional[int] = None
-    pagerank: Optional[float] = None
-    betweenness: Optional[float] = None
-    first_seen: Optional[str] = None
-    last_seen: Optional[str] = None
-    summary: Optional[str] = None
-    markdown: Optional[str] = None
-    sources: list[str] = Field(default_factory=list)
-    model: str = "qwen3.5:9b-instruct-q4_K_M"
-    generated_at: Optional[str] = None
-    human_edited: bool = False
+    file_path: str
+    note_id: Optional[str] = None
+    suggested_additions: list[str] = Field(default_factory=list)
+    reason: str
+    citation: Optional[Citation] = None
 
 
-class TreeNode(BaseModel):
-    """File tree node for vault explorer UI."""
+class AnalysisResult(BaseModel):
+    """
+    Returned by POST /api/case/analyse.
+    Contains New Connections, Files to Update, and Summary.
+    """
     model_config = ConfigDict(extra="allow")
 
-    name: str
-    displayName: str
-    path: str
-    isFolder: bool
-    children: list["TreeNode"] = Field(default_factory=list)
-    is_locked: Optional[bool] = None
+    case_id: str
+    summary: str
+    new_connections: list[Proposal] = Field(default_factory=list)
+    files_to_update: list[FileUpdateProposal] = Field(default_factory=list)
+    dropped_proposals_count: int = 0
+    analyzed_at: Optional[str] = None
 
 
-class CentralityItem(BaseModel):
-    """Centrality ranking item for analytics."""
+class Entity(BaseModel):
+    """
+    Entity representation in case vault markdown notes.
+    """
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    type: str  # person | identifier | vehicle | location | organisation | event
+    role: Optional[str] = None  # accused | witness | complainant | victim | officer
+    names: list[str] = Field(default_factory=list)
+    identifiers: list[str] = Field(default_factory=list)
+    case: str
+    created: Optional[str] = None
+    updated: Optional[str] = None
+    links: list[Link] = Field(default_factory=list)
+    body: Optional[str] = None
+    file_path: Optional[str] = None
+    properties: dict[str, Any] = Field(default_factory=dict)
+
+
+class CaseIndexEntry(BaseModel):
+    """
+    Compact entity record stored in _Case_Index.md.
+    Maintained for fast copilot retrieval without scanning entire vault.
+    """
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    type: str
+    role: Optional[str] = None
+    file_path: str
+    names: list[str] = Field(default_factory=list)
+    identifiers: list[str] = Field(default_factory=list)
+    existing_links: list[str] = Field(default_factory=list)
+    key_facts: list[str] = Field(default_factory=list)
+    mtime: float
+
+
+# Supporting schemas for endpoints
+
+class CaseSummary(BaseModel):
+    """Summary of a case folder."""
     model_config = ConfigDict(extra="allow")
 
     id: str
     name: str
-    type: str
-    degree: int
-    betweenness: float
-    pagerank: float
+    path: str
+    created: str
+    entity_count: int
+    document_count: int
+    link_count: int
 
 
-class CertificateResponse(BaseModel):
-    """Response payload for generated BSA §63 certificate."""
+class CopilotRequest(BaseModel):
+    """Question submitted to copilot."""
     model_config = ConfigDict(extra="allow")
 
-    pdf_path: str
-    sha256: str
-    status: str = "generated"
-    case_id: str
-    elements_certified: int
-    refused_elements: list[str] = Field(default_factory=list)
+    question: str
+    case_id: Optional[str] = None
 
 
-class VaultIntegrityResponse(BaseModel):
-    """Vault integrity status for evidence verification."""
+class CopilotResponse(BaseModel):
+    """Answer returned by copilot with surviving citations."""
+    model_config = ConfigDict(extra="allow")
+
+    answer: str
+    citations: list[Citation] = Field(default_factory=list)
+    notes_retrieved: list[str] = Field(default_factory=list)
+
+
+class IntegrityResponse(BaseModel):
+    """Evidence verification status for case."""
     model_config = ConfigDict(extra="allow")
 
     status: str = "verified"  # verified | contaminated
     failures: list[str] = Field(default_factory=list)
-    document_count: int = 5
+    document_count: int = 0
+    verified_at: Optional[str] = None
+
+
+class CrossCaseHit(BaseModel):
+    """Deterministic cross-case identifier match."""
+    model_config = ConfigDict(extra="allow")
+
+    identifier: str
+    cases: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    hit_type: str = "phone"
+
+
+class CrossCaseResponse(BaseModel):
+    """Collection of cross-case hits."""
+    model_config = ConfigDict(extra="allow")
+
+    hits: list[CrossCaseHit] = Field(default_factory=list)
+
+
+# Backward compatibility aliases
+Provenance = Citation
+
