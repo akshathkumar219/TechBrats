@@ -18,6 +18,7 @@ from brain.schemas import (
     CrossCaseResponse,
 )
 import brain.mocks as mocks
+from brain.ingest import router as ingest_router
 
 app = FastAPI(
     title="SyndicateBrain API",
@@ -33,6 +34,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(ingest_router)
 
 
 @app.get("/api/cases", response_model=list[CaseSummary])
