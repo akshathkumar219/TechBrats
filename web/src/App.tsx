@@ -89,6 +89,7 @@ export function App() {
           <FileTree
             files={files} folders={folders} selectedPath={activeFile?.path ?? null}
             reopenCandidateName={reopenCandidateName}
+            noteContents={noteContents}
             onSelectFile={selectFile} onReopenVault={reopenVault}
             isLoading={isLoading} error={error}
           />
@@ -122,7 +123,7 @@ export function App() {
       />
 
       <div className="window-too-small">
-        <h2>Desktop Window Too Small</h2>
+        <h2>SyndicateBrain requires a desktop display</h2>
         <p>SyndicateBrain requires a minimum viewport width of 1280px to display all investigation panes.</p>
       </div>
     </>
