@@ -1,89 +1,108 @@
-# HERMAINE — Backend: Graph Core, Provenance Enforcement, BSA §63 Certificate
+# HERMAINE — Case Index + Copilot Retrieval
 
-**Your track:** the product, and the single highest-value deliverable in the project.
-**Your clock:** 16 working hours.
-**Files you own exclusively:** `brain/graph/`, `brain/analytics/`, `brain/export/`
-**You depend on:** Akshath's `schemas.py` (W2). Blocked on nobody after that.
-**Blocked on you:** Akshath's canvas (W6), AKTA's inspector (W8). Your first two tasks unblock two people — ship them fast, polish them later.
+**Read `docs/CASE_MODEL.md` first**, especially §5 on the memory file.
+
+**Track:** the second-hardest thing in the build, and the panel a judge spends
+the most time looking at.
+**Clock:** 16 working hours.
+**You own exclusively:** `brain/index/`, `brain/retrieval/`, `web/src/copilot/`
+**You depend on:** Akshath's `schemas.py` (W2). Nothing after that.
+**Prompts:** HER-T01 → T06, in `docs/BUILD_PROMPTS.md`
 
 ---
 
 ## Why this track matters
 
-Two things in this project are genuinely novel, and you own both.
+Every team at this hackathon will bolt an LLM onto some documents. Two things
+separate ours, and you own both.
 
-**The provenance writer.** Every competing project will have a graph. Ours refuses to store an edge that can't name its source document and line. That's not a feature bolted on top — it's enforced at the write boundary, which means the guarantee is structural rather than aspirational. You are the person who makes that true.
+**The index.** We do not re-read the case on every question. `_Case_Index.md` is
+a compact summary of every entity in the case, always in context; the copilot
+reads it, decides which three or four full notes it actually needs, and pulls
+only those. "We don't scan a thousand files per question" is a much better
+answer to a judge than "we send everything each time" — and it's the difference
+between a demo and a system.
 
-**The BSA §63 certificate.** This is the headline. It's what turns "nice graph visualisation" into "output a court can accept." And it is the best-engineered task in the build: **deterministic code, no model, no ML, no probability.** Given the same subgraph it produces a byte-identical PDF, every single time. Under time pressure that reliability is worth more than any clever feature — which is exactly why it's yours.
+**The citation.** Every sentence the copilot emits carries a chip that opens the
+source file at the source line. An answer without a citation does not ship. That
+is Law 4, and it's what makes a detective able to trust the thing.
 
 ---
 
 ## Roadmap
 
-### W2–5 · `brain/graph/writer.py` — the enforcement layer 🔴 unblocks Akshath
+### W2–5 · `brain/index/build.py` — the memory file 🔴
 
-- [ ] Tables in SQLite: `nodes`, `edges`, `docs`, `provenance`. Schema mirrors Akshath's Pydantic models exactly.
-- [ ] **`add_edge()` raises `ProvenanceError` if `source_doc_id` or `locator` is missing or doesn't resolve to a real `Doc` row.** No `force` parameter. No `skip_validation` flag. No internal path that bypasses it. If someone asks you to add one, the answer is no.
-- [ ] Four tests that must fail loudly: no `source_doc_id` · `locator` present but `source_doc_id` dangling · both present but the doc row doesn't exist · both present but the locator is outside the document's range
-- [ ] `locator` format is fixed and documented in your module docstring: `page:3 line:11` for documents, `row:48219` for CDR. **AKTA's inspector and your certificate both parse this string** — agree the format with her at W2 and never change it after.
+- [ ] Walk a case folder. For every entity note, parse frontmatter and body into
+      one `CaseIndexEntry`: id, type, role, file path, names, identifiers,
+      existing links, the 3–5 facts that matter, and **the file's mtime**.
+- [ ] Write `_Case_Index.md` per `CASE_MODEL.md` §5 — markdown with YAML
+      frontmatter, grouped by folder. It must stay small enough to sit in
+      context whole. Target under 300 lines for an 80-note case; report the
+      actual token count.
+- [ ] `POST /api/index/rebuild` — the full rebuild, an explicit action.
 
-> **Use NetworkX + SQLite. Not KùzuDB.** An unfamiliar embedded graph DB is a two-hour risk in a 16-hour build for a benefit nobody in the room will notice. Print SQL in the certificate instead of Cypher — the reproducibility claim is byte-for-byte identical and the judges are reading the *guarantee*, not the query dialect.
+### W5–7 · Incremental refresh and staleness
 
-### W5–7 · Query endpoints 🔴 unblocks Akshath's canvas at W6
+**This is the thing that will silently break the demo if you skip it.** A
+detective edits a note by hand, the index still describes the old version, and
+the copilot answers from a stale line.
 
-- [ ] `GET /api/graph/subgraph` — params `case_id`, `center`, `depth`, `types[]`, `window_start`, `window_end`, `min_weight`. Returns Akshath's `SubgraphResponse` shape exactly.
-- [ ] `GET /api/graph/query` — filtered node/edge fetch
-- [ ] **Match `mocks.py` byte-for-byte, then delete the mock.** The frontend has been building against that shape for five hours; if your real response differs by one field name you cost Akshath and AKTA an hour each.
-- [ ] Hard cap: `LIMIT 2000` nodes, `8000` edges, ordered by degree descending. Akshath's canvas has a render budget and a 50,000-edge response is how you blow it.
+- [ ] On copilot open, compare each entry's stored mtime against the file on
+      disk. Any file newer than its entry gets re-read and **that entry alone**
+      rebuilt. Never the whole index mid-session.
+- [ ] A deleted file drops its entry. A new file gets one.
+- [ ] Report refresh time. It runs on every copilot open, so it needs to be
+      imperceptible — under 200ms for an 80-note case. Benchmark it.
 
-### W7–9 · `GET /api/edge/{id}/provenance` 🔴 unblocks AKTA
+### W7–10 · `brain/retrieval/` — two-tier retrieval 🔴 the core of your track
 
-This is the thesis made clickable — MDP item #3. Returns, for any edge:
+- [ ] Tier 1: the whole index into context, every question. It is small.
+- [ ] Tier 2: from the index, select the 3–5 notes the question actually needs,
+      read them in full, build the context pack.
+- [ ] Hard cap the pack and say so when you truncate. A silently truncated
+      context is an answer that's confidently missing half the case.
+- [ ] Every retrieved chunk keeps its source path and line offsets — the chips
+      in tier 3 are built from these, so they have to survive retrieval.
+- [ ] `POST /api/copilot/ask` → answer plus a citation list.
 
-- [ ] Source document: filename, type, SHA-256, ingest timestamp
-- [ ] Locator: the exact `page:line` or `row:N`
-- [ ] **The actual snippet of source text**, ±2 lines of context, raw — not paraphrased, not translated, not cleaned
-- [ ] The SQL that produced the edge, as a copy-pasteable string
-- [ ] Derivation chain if the edge came from a resolved entity (`Person A` merged from `Vikram Singh` + `Vicky` — AKTA's resolver writes this; agree the field shape with her)
+### W10–13 · `web/src/copilot/` — the panel
 
-### W9–11 · Temporal decay + centrality
+- [ ] Right-rail panel, mounts into Harleen's panel host. Message list, input at
+      the bottom, matching the existing shell exactly — no new visual language.
+- [ ] Stream the answer if the provider supports it. On a projector, text
+      appearing reads as thinking; a three-second blank panel reads as broken.
+- [ ] Show which notes were retrieved for this answer, collapsed. Judges like
+      seeing the working.
+- [ ] Zero hex codes. Every colour a token from Harleen's `index.css`.
 
-- [ ] **Decay at query time, not at write time.** `weight * exp(-lambda * age_days)`, `lambda` configurable in `Case_Config.yaml`. Write-time decay means re-writing the whole graph on every scrub — that's why it's query-time.
-- [ ] Window filtering on `window_start` / `window_end`. Akshath's timeline scrubber calls this repeatedly during a drag, so it needs to return in **under 200ms** on the full synthetic case. Index `edges(timestamp)`.
-- [ ] `brain/analytics/centrality.py` — PageRank, betweenness, degree via NetworkX. Endpoint `GET /api/analytics/centrality`.
-  - **Betweenness is the demo beat.** Akshath planted a proxy kingpin who never calls the hitmen: he must come out top-*betweenness* while ranking unremarkable on degree. Verify against `data/GROUND_TRUTH.md` the moment Mehul's data lands. If the planted answer doesn't surface, tell Akshath immediately — it's a data problem, not your problem, but only you will notice it.
+### W13–15 · Citation chips
 
-### W11–15 · 🏆 `brain/export/certificate.py` — BSA §63
+- [ ] Every claim in an answer carries an inline chip: source file + locator.
+- [ ] Clicking a chip calls Harleen's `openFileAt(path, line, span)` — opens the
+      note, scrolls, highlights. Agree the signature with her at W12.
+- [ ] **An uncited sentence is dropped before render.** Use Akshath's validator;
+      don't write your own.
 
-**Start this at W11 whatever else is unfinished.** It is the highest-value thing in the project and it must not be the thing that ran out of time. If centrality is half-done at W11, leave it half-done and start the certificate.
+### W15–16 · States 🔴 after feature freeze
 
-- [ ] `reportlab`. All seven sections per `blueprint.md` — do not abbreviate the section list.
-- [ ] Every claim in the PDF cites a `source_doc_id` + `locator`
-- [ ] Every source document's SHA-256 printed in full
-- [ ] The SQL that generated the subgraph, printed verbatim, so a third party can re-run it
-- [ ] Tool version + generation timestamp + case ID
-- [ ] **Deterministic:** same subgraph in → byte-identical PDF out. Fix the timestamp to the case's ingest time rather than `now()` so you can actually assert this. Write the test.
-- [ ] It must **look** like a legal document on a projector — serif body, numbered sections, a signature block, page `n of m`. Judges will read this on screen for maybe fifteen seconds; it has to read as official in the first two.
-
-### W15–16 · 🔴 Contamination refusal — the mic-drop
-
-- [ ] If **any** edge in the requested subgraph lacks resolvable provenance, or any source document's SHA-256 no longer matches the file on disk, the certificate **does not generate.**
-- [ ] Instead: a refusal page naming the exact offending edge, document, and reason.
-- [ ] This is 45 minutes of work and it's the strongest moment in the demo — a system that *refuses to certify contaminated evidence* is doing something no competitor will show. Make the refusal page look as considered as the certificate itself.
+- [ ] No case open · thinking · no answer found · provider unreachable.
+- [ ] **"I don't know" must be a real, well-designed answer.** A copilot that
+      says *"nothing in this case mentions that"* is more impressive to a police
+      judge than one that always produces a paragraph. Make that state look
+      deliberate, not like an error.
 
 ---
 
-## Cut to Future Scope — do not build these
+## Do not build
 
-Leiden/CPM community detection · GNN hypothesis sandbox · contradiction detector · adjudication queue · audit-log viewer · dossier PDF · multi-case federation · KùzuDB/Cypher
+A vector database · a second embedding model · chat history persistence across
+sessions · multi-case retrieval (identifier hits are Shourya's and deterministic)
+· any UI outside `web/src/copilot/`.
 
-**On Leiden specifically:** it was in scope and it's been cut. Community hulls only draw the gang boundaries — **betweenness alone already finds the proxy kingpin**, which is the actual demo beat. If you finish the certificate *and* contamination refusal before W14 and `main` is green, ask Akshath about adding it. Not before.
+## The two that cannot slip
 
----
-
-## The two things that cannot slip
-
-1. **`writer.py` rejecting provenance-less edges** — if this is soft, the entire pitch is a claim instead of a guarantee
-2. **The certificate generating and looking legal** — this is what the judges remember
-
-Everything else on this page is amplification. If you're behind at W13, tell Akshath which of the rest you're dropping; don't quietly compress these two.
+1. **The index refreshing incrementally and correctly.** Everything downstream
+   is wrong if it's stale.
+2. **Citations that click through to the right line.** An answer nobody can
+   verify is the thing we're building against.
