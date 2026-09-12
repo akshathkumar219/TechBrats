@@ -1,7 +1,10 @@
+import { AnalyseButton, type AnalysisResult } from './AnalyseButton'
+
 export type ActiveView = 'editor' | 'graph'
 
 export interface TitleBarProps {
   vaultName: string | null
+  caseId?: string
   isLoading?: boolean
   reopenCandidateName?: string | null
   activeView?: ActiveView
@@ -10,6 +13,7 @@ export interface TitleBarProps {
   onReopenVault?: () => void
   onNewNote?: () => void
   onNewFolder?: () => void
+  onAnalysisComplete?: (result: AnalysisResult) => void
 }
 
 const TITLE_CSS = `
@@ -153,6 +157,7 @@ const TITLE_CSS = `
 
 export function TitleBar({
   vaultName,
+  caseId,
   isLoading = false,
   reopenCandidateName,
   activeView = 'editor',
@@ -161,6 +166,7 @@ export function TitleBar({
   onReopenVault,
   onNewNote,
   onNewFolder,
+  onAnalysisComplete,
 }: TitleBarProps) {
   return (
     <header className="title">
@@ -239,6 +245,11 @@ export function TitleBar({
       </div>
 
       <div className="title-actions">
+        <AnalyseButton
+          vaultName={vaultName}
+          caseId={caseId || vaultName || 'Case_01_Sonipat_Arms'}
+          onAnalysisComplete={onAnalysisComplete}
+        />
         <button
           type="button"
           className="btn"
