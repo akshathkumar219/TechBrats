@@ -220,7 +220,7 @@ different command to work around it.
 | Person | Owns exactly | Prompt order |
 | :--- | :--- | :--- |
 | **Akshath** | `brain/schemas.py` `brain/mocks.py` `brain/main.py` `brain/guard.py` `brain/llm/` `brain/agents/` `brain/orchestrator.py` `brain/linker.py` `Makefile` `CLAUDE.md` `README.md` | T01 → T02 → T03 → T04 → T05 → T06 → T07 |
-| **Harleen** | `web/src/index.css` `web/src/components/` `web/src/editor/` `web/src/lib/` `web/src/state/` `web/src/fs/` `web/src/proposals/` `web/public/` | T01 → T02 → T03 → T04 → T05 → T06 → T07 |
+| **Harleen** | `web/src/index.css` `web/src/components/` `web/src/editor/` `web/src/lib/` `web/src/state/` `web/src/fs/` `web/src/proposals/` `web/public/` | ~~T01~~ → ~~T02~~ → **T03 (start here)** → T04 → T05 → T06 → T07 |
 | **Hermaine** | `brain/index/` `brain/retrieval/` `web/src/copilot/` | T01 → T02 → T03 → T04 → T05 → T06 |
 | **AKTA** | `web/src/graph/` `web/src/inspector/` | T01 → T02 → T03 → T04 → T05 |
 | **Shourya** | `brain/vault.py` `brain/ingest/` `brain/cdr/` `brain/crosscase.py` | T01 → T02 → T03 → T04 → T05 |
@@ -228,6 +228,10 @@ different command to work around it.
 
 **Never edit a file you don't own.** Need a change in someone else's file? Turn
 your chair and ask them.
+
+> **Already on `main`, do not rebuild:** AKS-T01, AKS-T02, HAR-T01, HAR-T02.
+> Harleen starts at step ▸ 11 (HAR-T03) — read the merged `web/src/index.css`
+> and the case tree before building on them. Akshath starts at step ▸ 5.
 
 ---
 
@@ -540,10 +544,11 @@ In this order:
    returns only what survives plus a list of what it dropped. This is Law 4 in
    code and it must exist even if all the model work slips.
 
-2. brain/llm/client.py as a PROVIDER INTERFACE, not a Gemini client. One
-   abstract class, two implementations: Gemini Flash and Ollama. Which one runs
-   is a key in Case_Config.yaml, nothing else changes. Keep the local path
-   working — it's what answers "does police data leave the building?"
+2. brain/llm/client.py as a PROVIDER INTERFACE, not an Ollama client. One
+   abstract class, two implementations: Ollama (the DEFAULT — provider: ollama)
+   and Gemini Flash. Which one runs is a key in Case_Config.yaml, nothing else
+   changes. Both must work: local is what we ship and demo, Gemini is the
+   parachute if local output is unusable.
    JSON mode, temperature 0, Pydantic validation against the target schema,
    exactly 1 retry, warmup() at app start.
 
@@ -1170,8 +1175,9 @@ localhost. Do not commit or push until I reply SHIP IT.
 > validator are built; we're running the model out-of-process for time."* Every
 > word true. Decide at W12, not W15.
 >
-> If you're demoing on Gemini Flash: hotspot ready, and cache the responses for
-> the exact demo path tonight.
+> We are on Ollama, so the demo is fully offline — no wifi dependency. Confirm
+> `warmup()` runs at app start, or your first call on stage is a 40-second cold
+> load. If local output is unusable, flipping to Gemini is one config key.
 
 ---
 
@@ -1253,8 +1259,8 @@ Time it and show me.
 
 Idempotent. Never touches anything outside the demo vault path.
 
-Also, if the provider is gemini: a --cached flag that serves recorded responses
-for the exact demo path, so a dead hotspot doesn't kill the run.
+Also a --cached flag that serves recorded responses for the exact demo path, so
+a model that stalls or degrades mid-demo doesn't kill the run.
 Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
 localhost. Do not commit or push until I reply SHIP IT.
@@ -1360,8 +1366,9 @@ until the demo.
   kingpin is, which two names are the alias pair, which statement contradicts
   which tower ping, which identifier bridges the two cases. Demo-design
   judgments; Antigravity writes the file around them.
-- **Decide the provider now** and put it in `Case_Config.yaml`. If Gemini: test
-  the venue wifi, get a hotspot, and cache the demo path.
+- **Provider is Ollama** (`provider: ollama` in `Case_Config.yaml`). Everyone
+  `ollama pull`s both models tonight — impossible at the venue. Keep a Gemini key
+  in the config as the parachute if local quality doesn't hold by W10.
 - **Review every PR before merging.** Only merger, 10-minute turnaround.
 - **Announce the schema freeze out loud** when AKS-T01 merges.
 - **Run W6 / W11 / W14 yourself, on the demo laptop.**

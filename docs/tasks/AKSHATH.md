@@ -58,10 +58,10 @@ Three things are load-bearing:
 
 ### W3–6 · The model layer — `brain/llm/`
 
-- [ ] `client.py` as a **provider interface**, not a Gemini client. Gemini Flash
-      and Ollama behind it, switched by one key in `Case_Config.yaml`. Keep the
-      local path working — it's what answers "does police data leave the
-      building?"
+- [ ] `client.py` as a **provider interface**, not an Ollama client. **Ollama is
+      the default** (`provider: ollama`); Gemini Flash sits behind the same
+      interface as the parachute, switched by one key in `Case_Config.yaml`.
+      Running local is what answers "does police data leave the building?"
 - [ ] JSON mode, temperature 0, Pydantic validation, exactly 1 retry, `warmup()`
       at app start.
 - [ ] **`brain/agents/validator.py` first** — deterministic Python, no model.
@@ -110,8 +110,8 @@ bug fixes, empty states, error states, polish, the reset script, the deck.
 - [ ] Deck via `populate_slides.py`. Everything cut goes on Future Scope as a
       decision with a reason.
 - [ ] **Rehearse 5 times minimum.** Demo laptop, on battery, wifi off — and if
-      you're demoing on Flash, have a phone hotspot and a cached-response
-      fallback for the exact demo path.
+      you're on Ollama the demo is fully offline — but `warmup()` must run at
+      app start or your first call on stage is a 40-second cold load.
 
 ---
 
