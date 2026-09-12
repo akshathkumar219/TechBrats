@@ -86,24 +86,26 @@ export function EdgeInspector({
     return parseLocatorLine(locator)
   }, [locator])
 
-  // Prepare raw snippet lines with ±2 context lines
+  // Prepare raw snippet lines with ±2 context lines. When the real line number
+  // isn't known, line numbers are left undefined rather than defaulting to a
+  // specific fabricated line (docs/OVERHAUL_SPEC.md §A2).
   const snippetLines = useMemo<SnippetLine[]>(() => {
     if (!edge) return []
 
-    const baseLineNum = lineNumber || 18
+    const baseLineNum = lineNumber
     const matchedLineText =
       edge.rawSnippet ||
       edge.citation?.snippet ||
       'No raw snippet recorded for this locator'
 
     const beforeLines: SnippetLine[] = (edge.contextBefore || []).map((text, idx, arr) => ({
-      lineNumber: baseLineNum - (arr.length - idx),
+      lineNumber: baseLineNum != null ? baseLineNum - (arr.length - idx) : undefined,
       text,
       isMatch: false,
     }))
 
     const afterLines: SnippetLine[] = (edge.contextAfter || []).map((text, idx) => ({
-      lineNumber: baseLineNum + (idx + 1),
+      lineNumber: baseLineNum != null ? baseLineNum + (idx + 1) : undefined,
       text,
       isMatch: false,
     }))
@@ -328,7 +330,7 @@ export function EdgeInspector({
               </div>
               <div className="edge-inspector-ai-metadata">
                 <div>
-                  <strong>Accepted:</strong> {edge.acceptedAt || '19 Feb 2026, 14:35 IST'}
+                  <strong>Accepted:</strong> {edge.acceptedAt || 'time not recorded'}
                   {edge.acceptedBy ? ` by ${edge.acceptedBy}` : ''}
                 </div>
                 {edge.aiProposalId && (
@@ -378,34 +380,44 @@ export function EdgeInspector({
             <div className="edge-inspector-meta-grid">
               <span className="edge-inspector-meta-label">Locator:</span>
               <div className="edge-inspector-meta-value">
-                <button
-                  type="button"
-                  className="edge-inspector-locator-chip is-clickable"
-                  onClick={handleOpenInSource}
-                  title={`Open source at ${locator}`}
-                >
-                  {locator}
-                </button>
+                {locator ? (
+                  <button
+                    type="button"
+                    className="edge-inspector-locator-chip is-clickable"
+                    onClick={handleOpenInSource}
+                    title={`Open source at ${locator}`}
+                  >
+                    {locator}
+                  </button>
+                ) : (
+                  <span className="edge-inspector-locator-chip">not recorded</span>
+                )}
               </div>
 
               <span className="edge-inspector-meta-label">Ingested:</span>
               <div className="edge-inspector-meta-value">
-                {edge.sourceDoc?.ingestTimestamp || '14 Feb 2026, 04:30 IST'}
+                {edge.sourceDoc?.ingestTimestamp || 'not recorded'}
               </div>
 
               <span className="edge-inspector-meta-label">SHA-256:</span>
               <div className="edge-inspector-meta-value">
-                <span className="edge-inspector-hash">
-                  {edge.sourceDoc?.sha256 ? `${edge.sourceDoc.sha256.slice(0, 8)}…${edge.sourceDoc.sha256.slice(-4)}` : 'a3f2…9c1e'}
-                </span>
-                <button
-                  type="button"
-                  className="edge-inspector-copy-btn"
-                  onClick={handleCopyHash}
-                  title="Copy full SHA-256 hash"
-                >
-                  {copiedHash ? '✓ copied' : 'copy'}
-                </button>
+                {edge.sourceDoc?.sha256 ? (
+                  <>
+                    <span className="edge-inspector-hash">
+                      {`${edge.sourceDoc.sha256.slice(0, 8)}…${edge.sourceDoc.sha256.slice(-4)}`}
+                    </span>
+                    <button
+                      type="button"
+                      className="edge-inspector-copy-btn"
+                      onClick={handleCopyHash}
+                      title="Copy full SHA-256 hash"
+                    >
+                      {copiedHash ? '✓ copied' : 'copy'}
+                    </button>
+                  </>
+                ) : (
+                  <span className="edge-inspector-hash edge-inspector-hash-unknown">not verified</span>
+                )}
               </div>
 
               {edge.observedAt && (
@@ -482,7 +494,12 @@ export function EdgeInspector({
           type="button"
           className="edge-inspector-btn-open"
           onClick={handleOpenInSource}
-          title={`Open ${edge.sourceDoc?.filename} at ${locator}`}
+          disabled={!edge.sourceDoc || !locator}
+          title={
+            edge.sourceDoc && locator
+              ? `Open ${edge.sourceDoc.filename} at ${locator}`
+              : 'No source locator recorded for this connection'
+          }
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />

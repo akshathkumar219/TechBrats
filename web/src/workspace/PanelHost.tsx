@@ -247,16 +247,13 @@ export function PanelHost({
     })
   }, [panelList, panels])
 
-  if (isCollapsed) {
-    return null
-  }
-
   const activeItem = normalizedPanels.find((p) => p.id === activePanel)
   const activeAccent = activeItem?.accentColor ?? getDefaultAccentColor(activePanel)
 
   return (
     <aside
       className={`panel-host ${className || ''}`}
+      hidden={isCollapsed}
       style={{
         width: width !== undefined ? (typeof width === 'number' ? `${width}px` : width) : undefined,
         flex: width !== undefined ? (typeof width === 'number' ? `0 0 ${width}px` : `0 0 ${width}`) : undefined,

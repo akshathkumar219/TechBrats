@@ -101,7 +101,7 @@ export interface EdgeInspectorProps {
  * - CDR: "row:48219"
  */
 export function formatLocator(rawLocator?: string | null): string {
-  if (!rawLocator) return 'p:1 l:1'
+  if (!rawLocator) return ''
   const trimmed = rawLocator.trim()
 
   // Match "row:48219" or "row: 48219" or "rows 4182-4213"
@@ -237,13 +237,31 @@ export const KNOWN_DOC_SNIPPETS: Record<
 /**
  * Normalizes any edge input shape into a consistent InspectableEdge.
  */
+// Normalizing an edge with no real citation must never invent a plausible-looking
+// one — a specific fake source_doc_id, locator, SHA-256, or timestamp shown in the
+// Provenance Inspector (this app's court-admissible-evidence panel) is worse than
+// an honest "not available" (docs/OVERHAUL_SPEC.md §F/§A2). Every field below is
+// either read from the real edge data or left undefined/null.
 export function normalizeEdge(raw: unknown): InspectableEdge | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
 
   const id = String(r.id || `edge_${Date.now()}`)
-  const source = String(r.source || r.source_entity || r.sourceId || 'Source Node')
-  const target = String(r.target || r.target_entity || r.targetId || 'Target Node')
+
+  // force-graph (and d3-force generally) mutates link.source/link.target from
+  // plain string ids into full resolved node objects once the simulation runs
+  // — String(nodeObject) silently renders "[object Object]" if that isn't
+  // accounted for here.
+  const endpointLabel = (endpoint: unknown, fallback: string): string => {
+    if (typeof endpoint === 'string') return endpoint
+    if (endpoint && typeof endpoint === 'object') {
+      const n = endpoint as Record<string, unknown>
+      return String(n.displayName || n.name || n.id || fallback)
+    }
+    return fallback
+  }
+  const source = endpointLabel(r.source, String(r.source_entity || r.sourceId || 'Source Node'))
+  const target = endpointLabel(r.target, String(r.target_entity || r.targetId || 'Target Node'))
 
   const claim =
     typeof r.claim === 'string'
@@ -267,22 +285,24 @@ export function normalizeEdge(raw: unknown): InspectableEdge | null {
     (rawCit.sourceDocId as string) ||
     (rawCit.sourceId as string) ||
     (r.sourceDocId as string) ||
-    'DOC_FIR_0142'
+    undefined
 
   const rawLocator =
     (rawCit.locator as string) ||
     (r.locator as string) ||
-    'p:1 l:18'
+    undefined
 
-  const citation = {
-    sourceId: sourceDocId,
-    sourceDocId,
-    source_doc_id: sourceDocId,
-    locator: rawLocator,
-    snippet: (rawCit.snippet as string) || (r.rawSnippet as string) || null,
-    observed_at: (rawCit.observed_at as string) || (r.observedAt as string) || null,
-    tier: (rawCit.tier as string) || (r.tier as string) || undefined,
-  }
+  const citation = sourceDocId
+    ? {
+        sourceId: sourceDocId,
+        sourceDocId,
+        source_doc_id: sourceDocId,
+        locator: rawLocator || 'not recorded',
+        snippet: (rawCit.snippet as string) || (r.rawSnippet as string) || null,
+        observed_at: (rawCit.observed_at as string) || (r.observedAt as string) || null,
+        tier: (rawCit.tier as string) || (r.tier as string) || undefined,
+      }
+    : undefined
 
   const isAi = Boolean(
     r.isAi ||
@@ -298,15 +318,9 @@ export function normalizeEdge(raw: unknown): InspectableEdge | null {
     (r.aiProposalId as string) ||
     (r.id && String(r.id).startsWith('prop_') ? String(r.id) : undefined)
 
-  const acceptedAt =
-    (r.acceptedAt as string) ||
-    (r.decided_at as string) ||
-    (isAi ? '2026-02-19 14:35:00 IST' : null)
+  const acceptedAt = (r.acceptedAt as string) || (r.decided_at as string) || null
 
-  const acceptedBy =
-    (r.acceptedBy as string) ||
-    (r.decided_by as string) ||
-    (isAi ? 'Inspector Ramphal (Lead IO)' : null)
+  const acceptedBy = (r.acceptedBy as string) || (r.decided_by as string) || null
 
   const tier = isAi
     ? r.status === 'accepted' || acceptedAt
@@ -314,28 +328,35 @@ export function normalizeEdge(raw: unknown): InspectableEdge | null {
       : 'ai-proposed'
     : 'record-derived'
 
-  // Document metadata resolution
-  const matchedKey = Object.keys(KNOWN_DOC_SNIPPETS).find((k) =>
-    sourceDocId.toUpperCase().includes(k.toUpperCase())
-  )
+  // Document metadata resolution — KNOWN_DOC_SNIPPETS holds verbatim demo-case
+  // reference text for known document ids; it is only consulted when the edge
+  // carries a real source_doc_id that matches one of them, never as a fallback
+  // for an edge with no citation at all.
+  const matchedKey = sourceDocId
+    ? Object.keys(KNOWN_DOC_SNIPPETS).find((k) =>
+        sourceDocId.toUpperCase().includes(k.toUpperCase())
+      )
+    : undefined
   const known = matchedKey ? KNOWN_DOC_SNIPPETS[matchedKey] : undefined
 
-  const sourceDoc = {
-    id: sourceDocId,
-    filename: (r.sourceDoc as Record<string, unknown>)?.filename
-      ? String((r.sourceDoc as Record<string, unknown>).filename)
-      : known
-      ? known.filename
-      : `${sourceDocId}.md`,
-    type: (r.sourceDoc as Record<string, unknown>)?.type
-      ? (String((r.sourceDoc as Record<string, unknown>).type) as SourceDocType)
-      : known
-      ? known.type
-      : inferDocType(sourceDocId),
-    sha256: known?.sha256 || 'a3f289b1c74d6e9021a8f9c1e45781a9',
-    ingestTimestamp: known?.ingestTimestamp || '2026-02-14 04:30:00 IST',
-    locked: true,
-  }
+  const sourceDoc = sourceDocId
+    ? {
+        id: sourceDocId,
+        filename: (r.sourceDoc as Record<string, unknown>)?.filename
+          ? String((r.sourceDoc as Record<string, unknown>).filename)
+          : known
+          ? known.filename
+          : `${sourceDocId}.md`,
+        type: (r.sourceDoc as Record<string, unknown>)?.type
+          ? (String((r.sourceDoc as Record<string, unknown>).type) as SourceDocType)
+          : known
+          ? known.type
+          : inferDocType(sourceDocId),
+        sha256: known?.sha256,
+        ingestTimestamp: known?.ingestTimestamp,
+        locked: true,
+      }
+    : undefined
 
   return {
     id,
@@ -354,13 +375,13 @@ export function normalizeEdge(raw: unknown): InspectableEdge | null {
     status: (r.status as string) || (isAi ? 'accepted' : 'record-derived'),
     sourceDoc,
     rawText: r.rawText as string | undefined,
-    rawSnippet: (r.rawSnippet as string) || citation.snippet || known?.matchedLine || null,
+    rawSnippet: (r.rawSnippet as string) || citation?.snippet || known?.matchedLine || null,
     contextBefore: (r.contextBefore as string[]) || known?.contextBefore,
     contextAfter: (r.contextAfter as string[]) || known?.contextAfter,
     matchedSpan: (r.matchedSpan as [number, number]) || known?.matchedSpan,
-    observedAt: (r.observedAt as string) || '12–19 Feb 2026',
-    weight: (r.weight as number | string) || '1.0',
-    effectiveWeight: (r.effectiveWeight as number | string) || '0.84',
+    observedAt: (r.observedAt as string) || null,
+    weight: r.weight as number | string | undefined,
+    effectiveWeight: r.effectiveWeight as number | string | undefined,
     callCount: (r.callCount as number) || undefined,
   }
 }
