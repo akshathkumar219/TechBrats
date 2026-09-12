@@ -60,14 +60,18 @@ def get_case_analyse(case_id: Optional[str] = None, case_path: Optional[str] = N
 @app.post("/api/copilot/ask", response_model=CopilotResponse)
 def post_copilot_ask(req: Optional[CopilotRequest] = None):
     """Ask copilot a question about the case, returning citations and notes retrieved."""
-    return mocks.ask_copilot(req=req)
+    from brain.retrieval.service import ask_copilot
+    question = req.question if req else "Who is Vikram Singh?"
+    case_id = req.case_id if req else None
+    return ask_copilot(question=question, case_id=case_id)
 
 
 @app.get("/api/copilot/ask", response_model=CopilotResponse)
 def get_copilot_ask(question: Optional[str] = None, case_id: Optional[str] = None):
     """GET convenience for asking copilot."""
-    req = CopilotRequest(question=question or "Who is Vikram Singh?", case_id=case_id)
-    return mocks.ask_copilot(req=req)
+    from brain.retrieval.service import ask_copilot
+    q = question or "Who is Vikram Singh?"
+    return ask_copilot(question=q, case_id=case_id)
 
 
 @app.get("/api/case/integrity", response_model=IntegrityResponse)
