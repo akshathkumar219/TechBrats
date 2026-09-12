@@ -1,23 +1,19 @@
 # BUILD_PROMPTS.md — the build, in the order it happens
 
-Every prompt in this project, **in the sequence they get sent**, with who sends
-each one. Read top to bottom and you are reading the day.
+Solo build. Every prompt, in the order you send them. Read top to bottom and you
+are reading the day.
 
-**How to use this file.** Work down the file. When you reach a prompt with your
-name on it, create your branch, copy the PREAMBLE (§1), paste it at the top of a
-new Antigravity session, then paste your prompt under it. One prompt = one
-branch = one PR.
+**How to run it.** Two messages per task: the scoping message (§0), then the
+preamble (§1) + the step's prompt. You check it on localhost, say COMMIT, the
+agent commits. No branches, no PRs — you work straight on `main`.
 
-**Antigravity runs git, but only on your word.** It creates the branch itself at
-the start. Then it builds, stops, and waits. You check the thing on localhost
-(`make dev`), read the diff (`git diff main --stat`, and look hard at anything
-outside your own paths). Only when you reply **SHIP IT** does it commit, push and
-open the PR. It never touches `main` — Akshath merges, as always.
+**Push at the end of every block.** The commits are your undo history; the push
+is your offsite backup. A block is 3–5 hours of work, so if the laptop dies
+between pushes, that is what you lose. Push more often if a block runs long.
 
-**The one rule that keeps six agents from colliding:** your Antigravity session
-works on **your steps only**. Never tell it to "work through the file" — it will
-cheerfully build someone else's track into your branch. One step, one branch, one
-PR, then you come back for the next one.
+**Run 2–3 sessions in parallel.** Different tasks, same repo, separate terminal
+tabs. The agent doesn't need you while it builds — that's where the speed is.
+Don't run two tasks that touch the same file at once.
 
 **What this file assumes — read `docs/CASE_MODEL.md` before anything else.**
 
@@ -27,108 +23,57 @@ PR, then you come back for the next one.
   `07_AI_Synthesis/`) and a `_Case_Index.md` memory file.
 - **The AI may only write links, and only after a human accepts them.**
   Everything else is a proposal the detective applies by hand.
+- **Provider is Ollama**, behind a provider interface with Gemini as the
+  parachute.
 - **`web/src/` already exists and works** — tokens, three-pane shell, tree, CM6
-  editor, live preview, wiki-links, backlinks, search. Nobody rebuilds it.
+  editor, live preview, wiki-links, backlinks, search. Don't rebuild it.
 
 **This supersedes** `blueprint.md` §3 and `docs/architecture.md` wherever they
-describe the retired graph-store design. The earlier planning docs — `prompts.md`,
-`roadmap.md`, `hackathon-plan.md`, `agents.md`, `model-bakeoff.md`,
-`antigravity-build-spec.md` — have been removed from the repo. They described a
-design we no longer build.
+describe the retired graph-store design.
 
 ---
 
-## 0. The four messages — every task, every person
+## 0. Two messages per task
 
-Replace everything in `<ANGLE BRACKETS>`. Same four messages for all six of you,
-every single task.
-
-### Message 1 — set up and branch
-
-Send this once per task, at the very start of a new Antigravity session.
+### Message 1 — scope it
 
 ```
-Set up git for me in this repo (github.com/akshathkumar219/TechBrats):
+Read docs/CASE_MODEL.md in full, then find step ▸ <N> in
+docs/BUILD_PROMPTS.md — the one labelled <TASK-ID>.
 
-git config user.name "<YOUR NAME>"
-git config user.email "<YOUR GITHUB EMAIL>"
+Work on THAT STEP ONLY. Do not read ahead and do not start any other step, even
+if one looks unfinished or broken.
 
-Then get me onto a fresh branch off the latest main:
-
-git checkout main
-git pull origin main
-git checkout -b <YOURNAME>/<TASK-ID>-<two words>
-
-Show me `git status` and `git branch --show-current` when you are done.
-Do not run any other git command.
+Confirm you have read both, tell me in one line what you understand the task to
+be, and wait. Do not start until I say GO.
 ```
 
-Branch name is lowercase, e.g. `harleen/T03-graph-seam`, `shourya/T02-ingest`.
-It's printed next to every step in this file — use that one, don't invent one.
+If what it says back is wrong, correct it in plain English before you say GO.
+Ten seconds there saves an hour.
 
-### Message 2 — scope it to one step
+### Message 2 — the preamble, then the step
 
-```
-Read docs/CASE_MODEL.md in full, then docs/tasks/<YOURNAME>.md, then find
-step ▸ <N> in docs/BUILD_PROMPTS.md — the one labelled <YOURNAME> · <TASK-ID>.
+Paste §1, then the step's prompt underneath it, then `GO`.
 
-Work on THAT STEP ONLY. Do not read ahead, do not start any other step, and do
-not touch any file outside the ownership list for <YOURNAME> in §2 of that file,
-even if another step looks unfinished or broken.
+The preamble is not a formality. It is what stops the agent inventing a
+different frontmatter shape at step 20 than it used at step 7. With nobody else
+reading the code, that drift is the thing most likely to quietly break you.
 
-Confirm you have read all three, tell me in one line what you understand the
-task to be, and wait. Do not start until I say GO.
-```
+### Then — check it, then commit
 
-It answers. If what it says back is wrong, correct it in plain English before
-you let it start — that costs ten seconds and saves an hour.
-
-### Message 3 — the preamble, then the step
-
-Paste §1 of this file, then the step's own prompt underneath it, then `GO`.
-
-The preamble is not optional and not a formality. It is where the agent learns
-which paths you own, the six laws, the permission boundary, and that it does not
-commit until you say so. Skip it and it will guess, confidently, on all four.
-
-### Message 4 — ship it
-
-Only after **you** have checked it: `make dev`, click the thing, confirm it does
-what the step said.
+`make dev`, click the thing, confirm it does what the step said. Then:
 
 ```
-git status
+COMMIT
 
-Show me that output and stop. Do not add anything yet.
-```
-
-Look at the list. One question: **is every file in it mine?** If something
-isn't, say *"that file isn't mine, don't add it"* and it will drop it.
-
-Then:
-
-```
-SHIP IT
-
-git add <the paths I own>
+git add <the files this task touched>
 git commit -m "<the commit message printed under the step>"
-git push -u origin <my branch>
-gh pr create --fill
 ```
 
-Then post `<TASK-ID> PR up` in the group chat and **start your next task
-immediately** — a fresh session, message 1 again. Don't sit waiting for the
-merge.
+Glance at `git status` before you say COMMIT. You're looking for one thing:
+files the task had no business touching.
 
-### If something goes wrong
-
-Talk to it in plain English — it knows the commands. *"You're on main, get off
-it."* *"That PR has a conflict, pull main into my branch first."* *"Undo the
-last commit but keep my changes."*
-
-Two it must never do, no matter what it suggests: `git reset --hard` and
-`git checkout .` Both silently delete uncommitted work. If it proposes either,
-say no and tell Akshath.
+**At the end of each block: `git push origin main`.**
 
 ---
 
@@ -167,14 +112,13 @@ The ONLY thing the AI may write into the vault is a link, and only after a human
 clicks Accept. It never edits note bodies, never renames files, never touches
 00_Raw_Inputs/. brain/linker.py is the single code path that writes a link.
 
-MY FILES. I own exactly these paths:
-  <<< PASTE YOUR OWN LIST FROM §2 HERE >>>
-Do not create, edit, rename or delete anything outside that list. If a change is
-needed elsewhere, stop and tell me which file and why. I will ask its owner.
+SCOPE. Touch only the files this step is about. If a change is needed somewhere
+else, stop and tell me which file and why before you touch it — I may have
+another session working in there right now.
 
 RULES
 - No hex codes, font sizes or spacing values. Every value is a var(--token) from
-  web/src/index.css. If the token doesn't exist, ask Harleen; don't invent one.
+  web/src/index.css. If the token doesn't exist, tell me and I'll add it.
 - No hardcoded thresholds, model names or provider keys. They live in
   Case_Config.yaml.
 - Do not invent field names, endpoint shapes, frontmatter keys or CSV column
@@ -186,52 +130,54 @@ RULES
 - Before you say you are done: the build runs, the feature works once by hand,
   and you touched no file outside my list. Show me the command output.
 
-GIT — YOU MAY RUN IT, WITHIN THESE LIMITS
+GIT — WAIT FOR MY WORD
 
-At the START, run exactly this and nothing else:
-  git checkout main
-  git pull origin main
-  git checkout -b <the branch name I gave you>
+We work on main. No branches, no PRs.
 
 While working: do not commit. Build the thing, then STOP and tell me what
 changed and exactly how to check it on localhost.
 
-When I reply with the words SHIP IT, and only then:
+When I reply with the word COMMIT, and only then:
   git status                    <- show me the output BEFORE you add anything
-  git add <only the paths I own>
+  git add <the files this task touched>
   git commit -m "<the exact message I give you>"
-  git push -u origin <branch>
-  gh pr create --fill
+
+Do not push. I push at the end of each block.
 
 NEVER, under any circumstance:
-- commit, push or merge to main
 - git push --force
 - git reset --hard, git checkout ., git clean, git stash drop
-- git add a path outside my ownership list
-- resolve a merge conflict on your own — stop and tell me
+- git add -A without showing me git status first
+- amend or rewrite a commit that already exists
 If a git command errors, STOP and show me the error verbatim. Do not run a
 different command to work around it.
 ```
 
 ---
 
-## 2. Your own line
+## 2. Progress
 
-| Person | Owns exactly | Prompt order |
-| :--- | :--- | :--- |
-| **Akshath** | `brain/schemas.py` `brain/mocks.py` `brain/main.py` `brain/guard.py` `brain/llm/` `brain/agents/` `brain/orchestrator.py` `brain/linker.py` `Makefile` `CLAUDE.md` `README.md` | T01 → T02 → T03 → T04 → T05 → T06 → T07 |
-| **Harleen** | `web/src/index.css` `web/src/components/` `web/src/editor/` `web/src/lib/` `web/src/state/` `web/src/fs/` `web/src/proposals/` `web/public/` | ~~T01~~ → ~~T02~~ → **T03 (start here)** → T04 → T05 → T06 → T07 |
-| **Hermaine** | `brain/index/` `brain/retrieval/` `web/src/copilot/` | T01 → T02 → T03 → T04 → T05 → T06 |
-| **AKTA** | `web/src/graph/` `web/src/inspector/` | T01 → T02 → T03 → T04 → T05 |
-| **Shourya** | `brain/vault.py` `brain/ingest/` `brain/cdr/` `brain/crosscase.py` | T01 → T02 → T03 → T04 → T05 |
-| **Mehul** | `data/` `web/src/changed/` `web/src/states/` | T01 → T02 → T03 → [verify] → T04 → T05 |
+Tick as you go. Four are already on `main`.
 
-**Never edit a file you don't own.** Need a change in someone else's file? Turn
-your chair and ask them.
+**Block 1 · W0–2** ✅ AKS-T01 ✅ AKS-T02 ✅ HAR-T01 ✅ HAR-T02
+**Block 2 · W2–3** ☐ AKS-T03 ☐ SHO-T01 ☐ HER-T01 ☐ AKT-T01 ☐ MEH-T01
+**Block 3 · W3–6** ☐ AKS-T04 ☐ HAR-T03 ☐ AKT-T02 ☐ SHO-T02 ☐ MEH-T02 ☐ HER-T02
+**Block 4 · W6–10** ☐ AKS-T05 ☐ HER-T03 ☐ HAR-T04 ☐ MEH-T03 ☐ AKT-T03 ☐ SHO-T03
+**Block 5 · W10–11** ☐ AKS-T06 ☐ SHO-T04 ☐ HER-T04 ☐ HAR-T05 ☐ [verify by hand]
+**Block 6 · W11–13** ☐ MEH-T04 ☐ AKT-T04 ☐ HAR-T06 ☐ HER-T05
+**Block 7 · W13–16** ☐ MEH-T05 ☐ SHO-T05 ☐ AKS-T07 ☐ HAR-T07 ☐ AKT-T05 ☐ HER-T06
 
-> **Already on `main`, do not rebuild:** AKS-T01, AKS-T02, HAR-T01, HAR-T02.
-> Harleen starts at step ▸ 11 (HAR-T03) — read the merged `web/src/index.css`
-> and the case tree before building on them. Akshath starts at step ▸ 5.
+Task IDs keep their original prefixes — they're in the commit messages and in
+`docs/tasks/*.md`, so leaving them alone keeps the history greppable.
+
+**If you fall behind, this is the cut list**, in order: focus mode · What
+Changed · edge inspector raw snippet · contradiction detection · cross-case hits
+· most of the polish pass. Every one goes on the Future Scope slide as a
+decision with a reason.
+
+**These four cannot be cut:** ingest that visibly refuses · Analyse returning
+cited proposals · Accept writing a real link · the copilot answering with a
+clickable citation.
 
 ---
 
@@ -242,7 +188,7 @@ Only Akshath and Harleen write code here. Everyone else does the W0 setup in
 
 ---
 
-### ▸ 1. AKSHATH · AKS-T01 · `akshath/T01-contract` 🔴 blocks all five
+### ▸ 1. AKS-T01 — contract
 
 ```
 Read docs/CASE_MODEL.md in full, then docs/tasks/AKSHATH.md "W0-2 · The
@@ -270,18 +216,15 @@ contract". Do not invent fields — if something is ambiguous, ask me.
 4. Makefile at repo root: `make dev` starts uvicorn on :8000 and vite on :5173.
 
 Verify: uvicorn starts clean, curl every endpoint, show me the output.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `AKS-T01: schemas frozen, mocks serving, FastAPI wired`
 
 ---
 
-### ▸ 2. HARLEEN · HAR-T01 · `harleen/T01-fonts`
-
-> Send at the same time as prompt 1. You are not blocked on Akshath.
+### ▸ 2. HAR-T01 — fonts
 
 ```
 Read design-system.md §1 and web/src/index.css (387 existing tokens — read them
@@ -298,16 +241,15 @@ before adding anything).
 
 Verify: render a code-mixed paragraph (Devanagari narrative, Latin names and
 digits inline) and screenshot it. Both scripts must sit correctly on one line.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `HAR-T01: self-hosted fonts and token audit`
 
 ---
 
-### ▸ 3. AKSHATH · AKS-T02 · `akshath/T02-guard` 🔴 blocks Shourya
+### ▸ 3. AKS-T02 — guard
 
 ```
 Read docs/CASE_MODEL.md §2 Law 1.
@@ -315,7 +257,7 @@ Read docs/CASE_MODEL.md §2 Law 1.
 brain/guard.py, about 40 lines:
 - assert_writable(path) — raises on any path under 00_Raw_Inputs/
 - safe_write(path, bytes) — calls assert_writable first
-- a registry of locked paths that Shourya's ingest registers into
+- a registry of locked paths that your ingest registers into
 
 Then tests/test_guard.py with four bypass attempts that must ALL raise:
   direct open(path,'w') · os.rename onto a locked path · shutil.copy onto a
@@ -323,16 +265,15 @@ Then tests/test_guard.py with four bypass attempts that must ALL raise:
 
 No force parameter. No skip_validation flag. No internal path that bypasses it.
 Run pytest and show me all four passing.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `AKS-T02: guard refuses writes to raw inputs`
 
 ---
 
-### ▸ 4. HARLEEN · HAR-T02 · `harleen/T02-case-tree`
+### ▸ 4. HAR-T02 — case tree
 
 ```
 Read docs/CASE_MODEL.md §3 and §4, and the existing web/src/components/ tree.
@@ -350,19 +291,28 @@ numbered subfolders 00_Raw_Inputs/ through 07_AI_Synthesis/.
 - Desktop-only guard below 1280px: a clean "SyndicateBrain requires a desktop
   display" panel. Do not build responsive layouts.
 
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `HAR-T02: case-folder tree with role badges`
 
 ---
 
-> ## 🚪 GATE W2 — Akshath says out loud: *"schemas are frozen, mocks are merged, guard is in, everyone go."*
+> ## 🚪 GATE W2 — say it out loud: *"schemas are frozen, mocks are merged, guard is in, everyone go."*
 >
 > If anyone is still waiting at W2:30, that is the only thing wrong with this
 > project and Akshath fixes it before anything else.
+
+---
+
+> ## ⬆️ END OF BLOCK 1 — push now
+>
+> ```bash
+> git push origin main
+> ```
+>
+> Everything since the last push is only on this laptop until you run that.
 
 ---
 
@@ -370,7 +320,7 @@ localhost. Do not commit or push until I reply SHIP IT.
 
 ---
 
-### ▸ 5. AKSHATH · AKS-T03 · `akshath/T03-ground-truth` 🔴 blocks Mehul
+### ▸ 5. AKS-T03 — ground truth
 
 > **Decide the four planted answers yourself, on paper, before sending this.**
 > See §10.
@@ -398,19 +348,18 @@ Then two templates:
 
 These are the contract Mehul generates 25,000 rows and 40 notes against. The
 frontmatter keys and the citation format have to be exactly right.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `AKS-T03: ground truth planted, note and CDR templates written`
 
 ---
 
-### ▸ 6. SHOURYA · SHO-T01 · `shourya/T01-vault`
+### ▸ 6. SHO-T01 — vault
 
-> Agree the `Case_Config.yaml` key names with Hermaine and Akshath **before**
-> you send this.
+> Decide the `Case_Config.yaml` key names now and write them down — your index
+> builder and orchestrator both read them, and changing them later is expensive.
 
 ```
 Read docs/CASE_MODEL.md §3 and docs/tasks/SHOURYA.md "W2-4".
@@ -421,8 +370,8 @@ endpoint.
 brain/vault.py:
 - create_case(vault_path, case_name) writes the EXACT structure from
   CASE_MODEL.md §3 — 00_Raw_Inputs/ through 07_AI_Synthesis/, plus
-  Case_Config.yaml and an empty _Case_Index.md. Exact, because Harleen's tree,
-  AKTA's parser and Hermaine's index all assume these paths.
+  Case_Config.yaml and an empty _Case_Index.md. Exact, because your tree,
+  your parser and your index all assume these paths.
 - open_case(path) validates the structure, returns metadata
 - Case_Config.yaml: case id, case name, created, model provider
   (gemini | ollama), model name, resolution thresholds, tool version
@@ -431,16 +380,15 @@ brain/vault.py:
 Hermaine and Akshath both read keys from this file. Use exactly the key names I
 give you and list them back to me when you're done.
 Also add vaults/ to .gitignore.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `SHO-T01: case create and open, config keys frozen`
 
 ---
 
-### ▸ 7. HERMAINE · HER-T01 · `hermaine/T01-index` 🔴 the copilot's foundation
+### ▸ 7. HER-T01 — index
 
 ```
 Read docs/CASE_MODEL.md §5 in full, and §4 for the note format.
@@ -455,18 +403,17 @@ brain/index/build.py:
   lines for an 80-note case. Report the actual line and token count.
 - POST /api/index/rebuild — full rebuild, an explicit action.
 
-Build it against Akshath's TEMPLATE_FIR.md format. If a note doesn't parse, log
+Build it against your TEMPLATE_FIR.md format. If a note doesn't parse, log
 the filename loudly and skip it — never guess at malformed frontmatter.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `HER-T01: case index builds from vault`
 
 ---
 
-### ▸ 8. AKTA · AKT-T01 · `akta/T01-parser`
+### ▸ 8. AKT-T01 — parser
 
 ```
 Read docs/CASE_MODEL.md §4 in full — the note frontmatter and the ## Links
@@ -485,16 +432,15 @@ web/src/graph/parse.ts — a pure function, no React, fully unit-testable:
 
 Write the unit tests: a well-formed note, a note with a missing citation, an
 unresolved link, an AI-marked link, malformed frontmatter. Show them passing.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `AKT-T01: vault parses into nodes and edges`
 
 ---
 
-### ▸ 9. MEHUL · MEH-T01 · `mehul/T01-roster`
+### ▸ 9. MEH-T01 — roster
 
 > Wait for AKS-T03 to merge — you need `GROUND_TRUTH.md` and both templates.
 
@@ -516,12 +462,21 @@ distinct, plus the cross-gang bridge node from GROUND_TRUTH.md.
 
 Do NOT make the planted answers obvious in this file. It's a cast list, not a
 solution key.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `MEH-T01: entity roster and gang structure`
+
+---
+
+> ## ⬆️ END OF BLOCK 2 — push now
+>
+> ```bash
+> git push origin main
+> ```
+>
+> Everything since the last push is only on this laptop until you run that.
 
 ---
 
@@ -529,7 +484,7 @@ localhost. Do not commit or push until I reply SHIP IT.
 
 ---
 
-### ▸ 10. AKSHATH · AKS-T04 · `akshath/T04-llm` 🔴 blocks your own orchestrator
+### ▸ 10. AKS-T04 — llm
 
 > Build the validator **before** the client. It ships whether or not the model
 > cooperates.
@@ -557,22 +512,21 @@ In this order:
 
 Verify: the validator drops an uncited sentence from a hand-written test input.
 Show me that, then the provider smoke test.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `AKS-T04: citation validator and provider-agnostic model client`
 
 ---
 
-### ▸ 11. HARLEEN · HAR-T03 · `harleen/T03-graph-seam` 🔴 talk to AKTA first
+### ▸ 11. HAR-T03 — graph seam
 
 ```
-Read design-system.md §2. TALK TO AKTA BEFORE STARTING — this is the one
-integration seam in my track.
+Read design-system.md §2. This is the one integration seam between the shell and
+the graph — get the container contract right now, not at step 12.
 
-The centre pane must toggle between the markdown editor and AKTA's graph canvas
+The centre pane must toggle between the markdown editor and your graph canvas
 WITHOUT remounting either. If the canvas remounts, the layout re-runs and the
 graph jumps.
 
@@ -588,16 +542,15 @@ shortcut. Judges need to see it being pressed.
 
 Verify: switch panes ten times, confirm node positions are pixel-identical
 before and after.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `HAR-T03: graph pane toggle without remount`
 
 ---
 
-### ▸ 12. AKTA · AKT-T02 · `akta/T02-engine`
+### ▸ 12. AKT-T02 — engine
 
 ```
 Read docs/tasks/AKTA.md "W5-9" and design-system.md §4.
@@ -615,21 +568,20 @@ Non-negotiable:
 - Expose exactly this API so nobody else opens this file: focusNode(id),
   applyFilter(pred), setSelection(ids), fitTo(ids), plus a selection-change
   event others subscribe to.
-- Mount into Harleen's stable container ONCE. Never remount.
+- Mount into your stable container ONCE. Never remount.
 
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `AKT-T02: cytoscape engine renders the vault at budget`
 
 ---
 
-### ▸ 13. SHOURYA · SHO-T02 · `shourya/T02-ingest` 🔴 the demo's opening beat
+### ▸ 13. SHO-T02 — ingest
 
 ```
-Read docs/tasks/SHOURYA.md "W4-8" and CASE_MODEL.md §2 Law 1. Akshath's
+Read docs/tasks/SHOURYA.md "W4-8" and CASE_MODEL.md §2 Law 1. your
 brain/guard.py is merged — call into it, don't reimplement it.
 
 Pipeline in THIS EXACT ORDER. The order is the guarantee.
@@ -646,16 +598,15 @@ POST /api/ingest accepts a file, runs the pipeline, returns the Doc.
 
 Then try to break it yourself: after ingest, attempt to append a byte with
 open(), with os.rename, and with shutil.copy. Show me all three failing.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `SHO-T02: ingest classifies, hashes, locks, records`
 
 ---
 
-### ▸ 14. MEHUL · MEH-T02 · `mehul/T02-narratives`
+### ▸ 14. MEH-T02 — narratives
 
 > Read every generated FIR yourself afterwards. See §10.
 
@@ -679,17 +630,16 @@ Then 3 witness statements — one carries the alibi contradiction from
 GROUND_TRUTH.md, exactly as that file specifies.
 
 Then a SECOND case folder with 6-8 notes, sharing exactly one identifier with
-the main case. That's Shourya's cross-case demo.
-Create your branch from main first, exactly as the preamble says, then build.
+the main case. That's your cross-case demo.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `MEH-T02: eight FIRs, three statements, second case`
 
 ---
 
-### ▸ 15. HERMAINE · HER-T02 · `hermaine/T02-incremental`
+### ▸ 15. HER-T02 — incremental
 
 > Skip this and the demo breaks silently. It's the highest-risk thing in your
 > track.
@@ -709,16 +659,15 @@ the old version, and the copilot answers from a stale line.
 
 Write the test: build an index, touch one note, refresh, assert exactly one
 entry changed and the others kept their original values byte-for-byte.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `HER-T02: incremental index refresh with staleness detection`
 
 ---
 
-> ## 🛑 CHECKPOINT W6 — Akshath stops the room
+> ## 🛑 CHECKPOINT W6 — stop and check
 >
 > **Must be true:** a case folder renders in the tree with role badges, the graph
 > toggle swaps panes without remounting, and the index builds from real notes.
@@ -726,17 +675,27 @@ localhost. Do not commit or push until I reply SHIP IT.
 
 ---
 
+> ## ⬆️ END OF BLOCK 3 — push now
+>
+> ```bash
+> git push origin main
+> ```
+>
+> Everything since the last push is only on this laptop until you run that.
+
+---
+
 # BLOCK 4 · W6–W10 — the agent layer and the copilot
 
 ---
 
-### ▸ 16. AKSHATH · AKS-T05 · `akshath/T05-orchestrator` 🏆 the product
+### ▸ 16. AKS-T05 — orchestrator
 
 ```
 Read docs/CASE_MODEL.md §6 in full and docs/tasks/AKSHATH.md "W6-10".
 
 brain/orchestrator.py:
-1. Loads _Case_Index.md (Hermaine's format — read it, don't rebuild it)
+1. Loads _Case_Index.md (your format — read it, don't rebuild it)
 2. Fans out to per-folder reader agents — People, Events, Locations,
    Identifiers, Organisations — each getting the relevant slice of the index
    plus the new raw input
@@ -755,18 +714,17 @@ the validator and counted, not returned.
 POST /api/case/analyse — this is what the Analyse case button calls. Match
 brain/mocks.py byte-for-byte, then delete the mock.
 
-Verify: run it on Mehul's case data and show me the full AnalysisResult JSON,
+Verify: run it on your case data and show me the full AnalysisResult JSON,
 plus how many proposals the validator dropped.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `AKS-T05: orchestrator returns validated proposals`
 
 ---
 
-### ▸ 17. HERMAINE · HER-T03 · `hermaine/T03-retrieval` 🔴 the core of your track
+### ▸ 17. HER-T03 — retrieval
 
 ```
 Read docs/CASE_MODEL.md §5 and docs/tasks/HERMAINE.md "W7-10".
@@ -781,26 +739,25 @@ brain/retrieval/ — two-tier:
   chips are built from these, so they must survive retrieval intact.
 
 POST /api/copilot/ask → { answer, citations[], notes_retrieved[] }
-Use Akshath's brain/llm/client.py — do not write your own model call.
+Use your brain/llm/client.py — do not write your own model call.
 Every sentence goes through his validator before it returns.
 
-Verify: ask three questions against Mehul's case, show me the answers and which
+Verify: ask three questions against your case, show me the answers and which
 notes were retrieved for each.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `HER-T03: two-tier retrieval with surviving citations`
 
 ---
 
-### ▸ 18. HARLEEN · HAR-T04 · `harleen/T04-raw-inputs`
+### ▸ 18. HAR-T04 — raw inputs
 
 ```
 Read docs/CASE_MODEL.md §2 Law 1 and §3, and design-system.md §7 for copy tone.
 
-1. A drop zone on 00_Raw_Inputs/ that calls Shourya's POST /api/ingest. Show
+1. A drop zone on 00_Raw_Inputs/ that calls your POST /api/ingest. Show
    the classify → hash → lock steps as they happen, not a spinner.
 2. Locked files render with a lock glyph and a muted row. Showing the guarantee
    before anyone clicks is a demo beat.
@@ -810,16 +767,15 @@ Read docs/CASE_MODEL.md §2 Law 1 and §3, and design-system.md §7 for copy ton
    POST /api/case/analyse. The loading state names which agent is currently
    running — on stage, visible work reads as capability.
 
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `HAR-T04: ingest drop zone, locked files, analyse button`
 
 ---
 
-### ▸ 19. MEHUL · MEH-T03 · `mehul/T03-cdr-generator`
+### ▸ 19. MEH-T03 — cdr generator
 
 > Ask Shourya for his exact Airtel header names first. Don't guess.
 
@@ -830,7 +786,7 @@ data/generate_cdr.py — a SCRIPT, not a hand-made CSV. I'll need to regenerate
 with more noise when the graph turns out to be a hairball at W10.
 
 ~25,000 rows: a_party, b_party, timestamp, duration_s, imei, cell_id. Headers
-matching Shourya's Airtel profile EXACTLY. Timestamps DD/MM/YYYY HH:MM:SS over
+matching your Airtel profile EXACTLY. Timestamps DD/MM/YYYY HH:MM:SS over
 ~3 months. Cell IDs HR-SNP-0147 format, ~15 towers, plausible clusters.
 
 Plant the structure from GROUND_TRUTH.md:
@@ -847,16 +803,15 @@ Also 2 tower dumps — CDR subsets by cell_id, including the ping that
 contradicts the statement alibi.
 
 data/GENERATION_NOTES.md — what you planted, where, and the row numbers.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `MEH-T03: CDR generator with planted structure`
 
 ---
 
-### ▸ 20. AKTA · AKT-T03 · `akta/T03-edge-classes` 🔴 what makes the AI honest
+### ▸ 20. AKT-T03 — edge classes
 
 ```
 Read docs/CASE_MODEL.md §2 Law 2 and design-system.md §4. This is not optional
@@ -876,16 +831,15 @@ web/src/graph/styles.ts — node shape, colour and size by entity type; edge sty
 by class. Every value a var(--token). ZERO hex codes. Use the same magenta token
 the proposal card uses, so the edge and the badge visibly agree.
 
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `AKT-T03: record-derived vs AI-proposed edges, leads toggle`
 
 ---
 
-### ▸ 21. SHOURYA · SHO-T03 · `shourya/T03-integrity`
+### ▸ 21. SHO-T03 — integrity
 
 ```
 On open_case, re-hash every file in 00_Raw_Inputs/ and compare to its sidecar.
@@ -893,15 +847,24 @@ On open_case, re-hash every file in 00_Raw_Inputs/ and compare to its sidecar.
 GET /api/case/integrity → {"status": "verified" | "contaminated",
 "failures": [...]}
 
-Harleen's status bar renders this: green "Evidence verified · 14 documents" vs
+your status bar renders this: green "Evidence verified · 14 documents" vs
 red "⚠ 1 document modified since ingest." Match brain/mocks.py byte-for-byte,
-then delete the mock, then tell her the shape.
-Create your branch from main first, exactly as the preamble says, then build.
+then delete the mock.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `SHO-T03: integrity verification on case open`
+
+---
+
+> ## ⬆️ END OF BLOCK 4 — push now
+>
+> ```bash
+> git push origin main
+> ```
+>
+> Everything since the last push is only on this laptop until you run that.
 
 ---
 
@@ -909,7 +872,7 @@ localhost. Do not commit or push until I reply SHIP IT.
 
 ---
 
-### ▸ 22. AKSHATH · AKS-T06 · `akshath/T06-linker` 🔴 the permission boundary
+### ▸ 22. AKS-T06 — linker
 
 ```
 Read docs/CASE_MODEL.md §6 "The permission boundary" and §4 on link format.
@@ -931,16 +894,15 @@ POST /api/proposal/{id}/accept and POST /api/proposal/{id}/reject
 
 Verify: accept a proposal, show me the note diff. Then try to write a link with
 a missing citation and show it refusing.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `AKS-T06: linker is the only writer of links`
 
 ---
 
-### ▸ 23. SHOURYA · SHO-T04 · `shourya/T04-cdr`
+### ▸ 23. SHO-T04 — cdr
 
 ```
 Read docs/tasks/SHOURYA.md "W10-13" and data/TEMPLATE_CDR.csv.
@@ -956,25 +918,24 @@ Read docs/tasks/SHOURYA.md "W10-13" and data/TEMPLATE_CDR.csv.
   Write a test that loads twice and asserts identical row numbers.
 - MATERIALISE NOTES: create/update 02_Identifiers/<number>.md per distinct
   number, and 06_Events/ notes for significant call clusters, in the exact
-  CASE_MODEL.md §4 format with citations. Write links through Akshath's
+  CASE_MODEL.md §4 format with citations. Write links through your
   brain/linker.py — never write to a ## Links section directly.
 
 POST /api/cdr/load
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `SHO-T04: CDR parses to DuckDB and materialises notes`
 
 ---
 
-### ▸ 24. HERMAINE · HER-T04 · `hermaine/T04-copilot-panel`
+### ▸ 24. HER-T04 — copilot panel
 
 ```
 Read docs/tasks/HERMAINE.md "W10-13".
 
-web/src/copilot/ — right-rail panel, mounts into Harleen's panel host.
+web/src/copilot/ — right-rail panel, mounts into your panel host.
 
 - Message list, input at the bottom. Match the existing shell exactly — no new
   visual language, no new component library.
@@ -984,16 +945,15 @@ web/src/copilot/ — right-rail panel, mounts into Harleen's panel host.
   like seeing the working.
 - Zero hex codes. Every colour a var(--token) from web/src/index.css.
 
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `HER-T04: copilot panel with streaming answers`
 
 ---
 
-### ▸ 25. HARLEEN · HAR-T05 · `harleen/T05-proposals` 🏆 the most important UI in the build
+### ▸ 25. HAR-T05 — proposals
 
 ```
 Read docs/CASE_MODEL.md §6 "Proposals" and docs/tasks/HARLEEN.md "W8-12".
@@ -1008,7 +968,7 @@ NEW CONNECTIONS — each is a card:
 - The model's confidence
 - ACCEPT and REJECT buttons
 
-Accept calls POST /api/proposal/{id}/accept — Akshath's linker writes the link.
+Accept calls POST /api/proposal/{id}/accept — your linker writes the link.
 Reject calls /reject. The card animates out either way.
 
 FILES TO UPDATE — read-only suggestions. NO accept button. NO edit button. Text
@@ -1020,31 +980,30 @@ SUMMARY — plain prose, with citation chips.
 Also: a count of AI-added links somewhere visible in the shell, with a way to
 see them all listed.
 
-Build against brain/mocks.py until Akshath's real endpoint lands.
-Create your branch from main first, exactly as the preamble says, then build.
+Build against brain/mocks.py until your real endpoint lands.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `HAR-T05: proposal panel with accept and reject`
 
 ---
 
-### ▸ 26. MEHUL · verification pass — **no prompt, by hand** 🔴 your most valuable hour
+### ▸ 26. Verification pass — **by hand, no prompt**
 
 Sit with three people in turn:
 
-- **Shourya** — does your data parse clean through his CDR loader? Fix
+- Does your data parse clean through his CDR loader? Fix
   mismatches on *your* side.
-- **Akshath** — run Analyse case on your data. Does the orchestrator find the
+- Run Analyse case on your data. Does the orchestrator find the
   planted connections? Does the contradiction surface? If not, it's a data
   problem and only you can fix it.
-- **AKTA** — look at the graph with your full dataset. Readable or hairball? If
-  hairball, tell her whether to cut entity count or tighten the default filter.
+- Look at the graph with your full dataset. Readable or hairball? If
+  hairball, decide whether to cut entity count or tighten the default filter.
 
 ---
 
-> ## 🛑 CHECKPOINT W11 — Akshath stops the room
+> ## 🛑 CHECKPOINT W11 — stop and check
 >
 > **Must be true, once, by hand, on the demo laptop:** drop a file in
 > `00_Raw_Inputs/` → press Analyse → proposals appear with citations → accept
@@ -1057,11 +1016,21 @@ Sit with three people in turn:
 
 ---
 
+> ## ⬆️ END OF BLOCK 5 — push now
+>
+> ```bash
+> git push origin main
+> ```
+>
+> Everything since the last push is only on this laptop until you run that.
+
+---
+
 # BLOCK 6 · W11–W13 — to the freeze
 
 ---
 
-### ▸ 27. MEHUL · MEH-T04 · `mehul/T04-what-changed`
+### ▸ 27. MEH-T04 — what changed
 
 ```
 web/src/changed/ — a self-contained React panel. Own file, one endpoint, nobody
@@ -1071,26 +1040,25 @@ After an Analyse run, show the diff at a glance:
   3 new connections proposed · 2 files to update · 1 contradiction found ·
   1 cross-case hit
 
-Each row clickable, jumping to the relevant card in Harleen's proposal panel.
+Each row clickable, jumping to the relevant card in your proposal panel.
 Use her exposed functions — do not edit her files.
 
 This is the natural landing screen after pressing the button. It must read from
-across a room. Styling from Harleen's tokens, no hex codes.
-Create your branch from main first, exactly as the preamble says, then build.
+across a room. Styling from your tokens, no hex codes.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `MEH-T04: what changed summary view`
 
 ---
 
-### ▸ 28. AKTA · AKT-T04 · `akta/T04-inspector`
+### ▸ 28. AKT-T04 — inspector
 
 ```
 Read design-system.md §5 and docs/tasks/AKTA.md "W12-15".
 
-web/src/inspector/ — right-rail panel, mounts into Harleen's panel host, opens
+web/src/inspector/ — right-rail panel, mounts into your panel host, opens
 on edge selection. Subscribe to your own engine's selection event.
 
 Shows:
@@ -1104,19 +1072,17 @@ Shows:
 - Evidentiary status badge using the same tokens as your edge styles
 
 Zero hex codes.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `AKT-T04: edge inspector shows the raw source`
 
 ---
 
-### ▸ 29. HARLEEN · HAR-T06 · `harleen/T06-open-file-at` 🔴 blocks AKTA and Hermaine
+### ▸ 29. HAR-T06 — open file at
 
-> **Ship at W12.** Both of them need it and neither has hours at W15. Agree the
-> signature with both before you send this.
+> **Do this before steps 30 and 35** — both call into it.
 
 ```
 Two exports, from one clearly named module:
@@ -1134,38 +1100,36 @@ W13 — three people call them.
 
 Verify: call openFileAt on a closed file while the graph pane is showing, and
 confirm it switches panes, opens, scrolls and highlights.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `HAR-T06: openFileAt and right-rail panel host`
 
 ---
 
-### ▸ 30. HERMAINE · HER-T05 · `hermaine/T05-citation-chips`
+### ▸ 30. HER-T05 — citation chips
 
 ```
 Every claim in a copilot answer carries an inline chip: source file + locator.
 
-Clicking a chip calls Harleen's openFileAt(path, line, span) — opens the note,
+Clicking a chip calls your openFileAt(path, line, span) — opens the note,
 scrolls, highlights the span.
 
-An uncited sentence is DROPPED BEFORE RENDER. Use Akshath's
+An uncited sentence is DROPPED BEFORE RENDER. Use your
 brain/agents/validator.py; do not write your own.
 
 Verify: ask a question whose answer spans two notes, and click through both
 chips to the right lines.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `HER-T05: citation chips click through to source`
 
 ---
 
-> ## ⏰ W12 — GO/NO-GO. Akshath decides, on the clock.
+> ## ⏰ W12 — GO/NO-GO. decide, on the clock.
 >
 > One question: **has the orchestrator returned a schema-valid `AnalysisResult`
 > with resolvable citations, once, on real case data?**
@@ -1181,7 +1145,7 @@ localhost. Do not commit or push until I reply SHIP IT.
 
 ---
 
-> ## 🔴 W13 — FEATURE FREEZE. Akshath enforces it.
+> ## 🔴 W13 — FEATURE FREEZE. enforce it on yourself.
 >
 > No new features from anyone, including him. Permitted from here: bug fixes,
 > empty states, error states, visual polish, the reset script, the deck.
@@ -1191,13 +1155,23 @@ localhost. Do not commit or push until I reply SHIP IT.
 
 ---
 
+> ## ⬆️ END OF BLOCK 6 — push now
+>
+> ```bash
+> git push origin main
+> ```
+>
+> Everything since the last push is only on this laptop until you run that.
+
+---
+
 # BLOCK 7 · W13–W16 — polish, cross-case, rehearsal
 
 ---
 
-### ▸ 31. MEHUL · MEH-T05 · `mehul/T05-ui-states`
+### ▸ 31. MEH-T05 — ui states
 
-> First in the block — Harleen, AKTA and Hermaine all import these.
+> First in the block — steps 34, 35 and 36 all import these.
 
 ```
 Read design-system.md §7 for copy tone.
@@ -1212,17 +1186,16 @@ Copy tone: "Named as accused in 3 FIRs", never "High risk individual". The
 product reports what the record says; it never editorialises about people. That
 rule holds in empty-state copy too.
 
-Export from one index. Tell the other three the moment they're available.
-Create your branch from main first, exactly as the preamble says, then build.
+Export from one index.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `MEH-T05: shared empty, loading and error states`
 
 ---
 
-### ▸ 32. SHOURYA · SHO-T05 · `shourya/T05-crosscase` 🔴 the feature nobody else has
+### ▸ 32. SHO-T05 — crosscase
 
 ```
 Read docs/tasks/SHOURYA.md "W13-16".
@@ -1238,19 +1211,18 @@ DETERMINISTIC. No model. Exact match on normalised values only — a fuzzy
 cross-case hit is a wrongful lead and there's no reason to risk it.
 
 Surface it in two places: in the AnalysisResult, and as a line in the
-identifier's own note (written through Akshath's linker).
+identifier's own note (written through your linker).
 
-Verify against Mehul's second case — the planted identifier must be the hit.
-Create your branch from main first, exactly as the preamble says, then build.
+Verify against your second case — the planted identifier must be the hit.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `SHO-T05: cross-case identifier hits`
 
 ---
 
-### ▸ 33. AKSHATH · AKS-T07 · `akshath/T07-reset`
+### ▸ 33. AKS-T07 — reset
 
 ```
 `make reset` at repo root: wipes the demo case, re-ingests the synthetic case
@@ -1261,19 +1233,18 @@ Idempotent. Never touches anything outside the demo vault path.
 
 Also a --cached flag that serves recorded responses for the exact demo path, so
 a model that stalls or degrades mid-demo doesn't kill the run.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `AKS-T07: make reset restores demo state`
 
 ---
 
-### ▸ 34. HARLEEN · HAR-T07 · `harleen/T07-polish`
+### ▸ 34. HAR-T07 — polish
 
 ```
-Read design-system.md §7. Use Mehul's components from web/src/states/ — do not
+Read design-system.md §7. Use your components from web/src/states/ — do not
 write your own.
 
 No new features:
@@ -1285,41 +1256,39 @@ No new features:
 
 Then walk the entire UI at 1920x1080 and LIST every misalignment you find before
 fixing any of them. Show me the list first.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `HAR-T07: empty states, skeletons, focus rings`
 
 ---
 
-### ▸ 35. AKTA · AKT-T05 · `akta/T05-focus-states`
+### ▸ 35. AKT-T05 — focus states
 
 ```
 - Focus mode: F on a selected node dims everything more than one hop away.
   Escape clears.
-- Clicking the locator in the inspector calls Harleen's openFileAt(path, line,
+- Clicking the locator in the inspector calls your openFileAt(path, line,
   span). Do not reach into her files — call her exported function.
-- States, using Mehul's shared components: no case open · case has no links yet ·
+- States, using your shared components: no case open · case has no links yet ·
   loading skeleton · parse error, naming the file that broke it.
 
 "Here is the connection. Here is the exact line in the original FIR it came
 from." That click-through is the most persuasive fifteen seconds in the project
 — make sure it never fails.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `AKT-T05: focus mode, click-through, graph states`
 
 ---
 
-### ▸ 36. HERMAINE · HER-T06 · `hermaine/T06-states`
+### ▸ 36. HER-T06 — states
 
 ```
-States for the copilot, using Mehul's shared components:
+States for the copilot, using your shared components:
 - No case open
 - Thinking
 - Provider unreachable — say which provider and that the local one is available
@@ -1329,83 +1298,86 @@ Make "I don't know" a real, well-designed answer. A copilot that says "nothing
 in this case mentions that" is more impressive to a police judge than one that
 always produces a paragraph. That state should look deliberate, not like an
 error. Give it as much design attention as the answer state.
-Create your branch from main first, exactly as the preamble says, then build.
 When you are finished, stop and tell me what changed and how to check it on
-localhost. Do not commit or push until I reply SHIP IT.
+localhost. Do not commit until I reply COMMIT.
 ```
 
 > **Commit:** `HER-T06: copilot states including a real I-dont-know`
 
 ---
 
-> ## 🛑 CHECKPOINT W14 — Akshath stops the room
+> ## 🛑 CHECKPOINT W14 — stop and check
 >
 > **Must be true:** the full 5-minute demo runs start to finish with no
 > intervention except his clicks.
 
 ---
 
+> ## ⬆️ END OF BLOCK 7 — push now
+>
+> ```bash
+> git push origin main
+> ```
+
+---
+
 # 10. Not for Antigravity — the human tasks
 
 An agent will produce something plausible and wrong here, and you won't notice
-until the demo.
+until the demo. Running solo, nobody else will catch it either.
 
-### Everyone, at W0 — before prompt 1
+### Before step 5 — the four planted answers
 
-- Clone, `npm install` in `web/`, `pip install -r requirements.txt`
-- If using Ollama locally: `ollama pull` both models. Slow — start it first.
-- **Read `docs/CASE_MODEL.md`.** All of it. It's the contract between all six of
-  you.
-- Read `docs/tasks/GITHUB_RULES.md` §2 and §4, confirm in the group chat
-- Confirm `make dev` runs on your laptop. If one person's environment is broken,
-  the whole team stops.
+Decide these yourself, on paper, before you send the ground-truth prompt. It's
+the one step in the build with a human prerequisite and no fallback.
 
-### Akshath, throughout
+1. **Proxy kingpin** — which name, and who his 2–3 lieutenants are
+2. **Alias pair** — the two names and the IMEI they share
+3. **Alibi contradiction** — which witness says they were where, and which tower
+   ping says otherwise
+4. **Cross-case hit** — which phone or IMEI appears in both cases
 
-- **Before prompt 5: pick the four planted answers yourself.** Who the proxy
-  kingpin is, which two names are the alias pair, which statement contradicts
-  which tower ping, which identifier bridges the two cases. Demo-design
-  judgments; Antigravity writes the file around them.
-- **Provider is Ollama** (`provider: ollama` in `Case_Config.yaml`). Everyone
-  `ollama pull`s both models tonight — impossible at the venue. Keep a Gemini key
-  in the config as the parachute if local quality doesn't hold by W10.
-- **Review every PR before merging.** Only merger, 10-minute turnaround.
-- **Announce the schema freeze out loud** when AKS-T01 merges.
-- **Run W6 / W11 / W14 yourself, on the demo laptop.**
-- **Call W12 on the clock. Enforce W13.**
-- **Write the 5-minute demo script** — exact click sequence, opening line,
-  closing line, the sentence you say while each thing loads.
-- **Rehearse 5 times minimum**, demo laptop, on battery.
+Paste them into the prompt where it says *"I will give you the four planted
+answers."*
 
-### Cross-person agreements — settle these at W2, in person
+### Judgment calls the agent cannot make
 
-| What | Between | Why |
-| :--- | :--- | :--- |
-| Frontmatter keys + `^[source locator]` format | Akshath → everyone | Four people parse notes |
-| `Case_Config.yaml` key names | Shourya ↔ Hermaine ↔ Akshath | Provider and thresholds read from it |
-| `_Case_Index.md` entry shape | Hermaine ↔ Akshath | Orchestrator reads her index |
-| `AnalysisResult` shape | Akshath ↔ Harleen ↔ Mehul | Proposal panel and What Changed render it |
-| Centre-pane container contract | Harleen ↔ AKTA | Canvas must not remount |
-| `openFileAt` signature | Harleen ↔ AKTA ↔ Hermaine | Ship W12; neither has hours at W15 |
-| Airtel CDR header names | Shourya ↔ Mehul | Generator must match parser exactly |
-| The magenta AI token | AKTA ↔ Harleen | Edge and badge must be the same token |
+- **Read every generated FIR yourself.** One that says "the suspect engaged in
+  criminal activity" reads as a toy on a projector. It must say who, when,
+  where, which section, which phone.
+- **Tune the kingpin by hand at step 26.** He must be unremarkable on call
+  volume and first on structural centrality. If he isn't, regenerate.
+- **Judge whether the proposals are *useful*, not just well-formed.** A cited
+  but obvious link is worse than no link.
+- **Ask the copilot ten questions a detective would actually ask** and read the
+  answers properly.
+- **Decide whether the graph is readable or a hairball.** That's an eye, not a
+  test.
+- **Break your own ingest lock by hand**, three ways, after the tests pass.
 
-### Judgment calls no agent should make
+### The clock
 
-- **Mehul:** read every generated FIR yourself. One that says "the suspect
-  engaged in criminal activity" reads as a toy on a projector.
-- **Mehul:** tune the kingpin by hand against real output at W11.
-- **Akshath:** read the proposals the orchestrator produces and judge whether
-  they're *useful*, not just well-formed. A cited but obvious link is worse than
-  no link.
-- **Hermaine:** ask the copilot ten questions a detective would actually ask and
-  judge the answers. Nobody else will.
-- **AKTA:** decide whether the graph is readable or a hairball. That's an eye.
-- **Harleen:** the 1920×1080 alignment walk. List before fixing.
-- **Shourya:** break your own ingest lock by hand, three ways, after the tests
-  pass.
+- **W6 / W11 / W14** — stop building, run the checkpoint on the demo laptop.
+  Timebox 15 minutes. Write down what broke before fixing anything.
+- **W12** — GO/NO-GO on the model. One question: has the orchestrator returned a
+  schema-valid AnalysisResult with resolvable citations, once, on real data? No
+  means take the fallback immediately.
+- **W13** — feature freeze. From here: bug fixes, empty states, polish, reset
+  script, deck. Nothing new.
 
-### Escalation
+### The last three hours
 
-Behind? Say so **early**. Akshath can re-route at W10 and cannot at W15.
-Telling the room early costs nothing; telling it late costs the demo.
+- `make reset` working and timed
+- The 5-minute demo script written down — exact click sequence, opening line,
+  closing line, the sentence you say while each thing loads
+- **Rehearse 5 times.** Demo laptop, on battery. On Ollama the demo is fully
+  offline, but confirm `warmup()` runs at app start or your first call on stage
+  is a 40-second cold load.
+- Deck via `populate_slides.py`. Everything cut goes on Future Scope as a
+  decision with a reason.
+
+### Sleep
+
+Nobody else is building. The project stops when you stop — so plan when you go
+down and what state `main` is in before you do. Ideally the four-that-cannot-slip
+are working and pushed, so a bad night costs polish, not the demo.
