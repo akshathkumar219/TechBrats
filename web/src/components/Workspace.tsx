@@ -6,6 +6,9 @@ import { StatusBar } from './StatusBar'
 import { TitleBar, type ActiveView } from './TitleBar'
 import { CopilotPanel } from '../copilot'
 import { ProposalPanel } from '../proposals'
+import { EdgeInspector } from '../inspector'
+import { WhatChangedPanel } from '../changed'
+import { PanelHost, onOpenFileAt, type StandardPanelId } from '../workspace'
 
 /* ------------------------------------------------------------------ *
  * Workspace — the Obsidian-style shell. One file, layout only.
@@ -367,6 +370,8 @@ const I = {
   x: 'M6 6l12 12|M18 6L6 18',
   copilot: 'M12 4a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-4a3 3 0 0 1 3-3h1V8a4 4 0 0 1 4-4z|M9.5 14h.01|M14.5 14h.01',
   proposals: 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2|M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z|M9 14l2 2 4-4',
+  inspector: 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z|M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
+  changed: 'M12 8v4l3 3|M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z',
   graph: 'M6 3a3 3 0 1 0 0 6 3 3 0 1 0 0-6|M18 3a3 3 0 1 0 0 6 3 3 0 1 0 0-6|M12 15a3 3 0 1 0 0 6 3 3 0 1 0 0-6|M9 6h6|M7.5 8.5l3 7|M16.5 8.5l-3 7',
   settings: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6|M4 12h2|M18 12h2|M12 4v2|M12 18v2',
   help: 'M9.5 9a2.5 2.5 0 1 1 3 2.5V13|M12 16.5h.01|M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18',
@@ -459,7 +464,7 @@ export function Workspace(p: WorkspaceProps) {
     return 300
   })
   const [leftView, setLeftView] = useState<'files' | 'search' | 'bookmarks'>('files')
-  const [rightView, setRightView] = useState<'copilot' | 'proposals'>('copilot')
+  const [rightView, setRightView] = useState<StandardPanelId>('copilot')
   const [internalView, setInternalView] = useState<ActiveView>('editor')
   const activeView = p.activeView ?? internalView
   const setView = useCallback(
@@ -469,6 +474,35 @@ export function Workspace(p: WorkspaceProps) {
     },
     [p]
   )
+
+  useEffect(() => {
+    return onOpenFileAt(({ path }) => {
+      if (activeView !== 'editor') {
+        setView('editor')
+      }
+      const matching = p.files.find((f) => f.path === path || f.path.endsWith(path) || path.endsWith(f.name))
+      if (matching) {
+        p.onSelectFile(matching.path)
+      }
+    })
+  }, [activeView, p, setView])
+
+  useEffect(() => {
+    const handleEdgeSelected = () => {
+      setRightView('inspector')
+      setRightOpen(true)
+    }
+    const handleNavProposal = () => {
+      setRightView('proposals')
+      setRightOpen(true)
+    }
+    window.addEventListener('syndicate-brain:edge-selected', handleEdgeSelected)
+    window.addEventListener('syndicate-brain:navigate-proposal', handleNavProposal)
+    return () => {
+      window.removeEventListener('syndicate-brain:edge-selected', handleEdgeSelected)
+      window.removeEventListener('syndicate-brain:navigate-proposal', handleNavProposal)
+    }
+  }, [])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -616,6 +650,16 @@ export function Workspace(p: WorkspaceProps) {
               if (rightOpen && rightView === 'proposals') setRightOpen(false)
               else { setRightView('proposals'); setRightOpen(true) }
             }} />
+          <IconBtn icon={I.inspector} label="Edge Inspector" active={rightOpen && rightView === 'inspector'}
+            onClick={() => {
+              if (rightOpen && rightView === 'inspector') setRightOpen(false)
+              else { setRightView('inspector'); setRightOpen(true) }
+            }} />
+          <IconBtn icon={I.changed} label="What Changed Diff" active={rightOpen && rightView === 'changed'}
+            onClick={() => {
+              if (rightOpen && rightView === 'changed') setRightOpen(false)
+              else { setRightView('changed'); setRightOpen(true) }
+            }} />
           <div className="ws-ribbon-spacer" />
           <IconBtn icon={I.settings} label="Settings (not wired)" disabled />
         </nav>
@@ -730,63 +774,28 @@ export function Workspace(p: WorkspaceProps) {
           </div>
         </main>
 
-        {/* right rail: Copilot and Proposals */}
+        {/* right rail hosted panels */}
         {rightOpen && (
           <>
             <div className={`ws-handle${rightDrag.dragging ? ' is-dragging' : ''}`}
               onPointerDown={rightDrag.onPointerDown} />
             <aside className="ws-pane ws-pane-right" style={{ width: rightW, flex: `0 0 ${rightW}px` }}>
-              <div className="ws-pane-head" style={{ gap: 'var(--s2)' }}>
-                <button
-                  type="button"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--s1)',
-                    fontSize: 'var(--fs-sm)',
-                    fontWeight: rightView === 'copilot' ? 600 : 400,
-                    color: rightView === 'copilot' ? 'var(--accent)' : 'var(--text-muted)',
-                    borderBottom: rightView === 'copilot' ? '2px solid var(--accent)' : '2px solid transparent',
-                    padding: '0 var(--s2)',
-                    height: '100%',
-                  }}
-                  onClick={() => setRightView('copilot')}
-                >
-                  <Svg d={I.copilot} />
-                  <span>Copilot</span>
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--s1)',
-                    fontSize: 'var(--fs-sm)',
-                    fontWeight: rightView === 'proposals' ? 600 : 400,
-                    color: rightView === 'proposals' ? 'var(--hypothesis, var(--accent))' : 'var(--text-muted)',
-                    borderBottom: rightView === 'proposals' ? '2px solid var(--hypothesis, var(--accent))' : '2px solid transparent',
-                    padding: '0 var(--s2)',
-                    height: '100%',
-                  }}
-                  onClick={() => setRightView('proposals')}
-                >
-                  <Svg d={I.proposals} />
-                  <span>Proposals</span>
-                </button>
-                <span className="ws-grow" />
-                <IconBtn icon={I.panelRight} label="Collapse right rail"
-                  onClick={() => setRightOpen(false)} />
-              </div>
-              <div className="ws-pane-body" style={{ overflow: 'hidden' }}>
-                {rightView === 'copilot' ? (
+              <PanelHost
+                activePanel={rightView}
+                onSelectPanel={(pId) => setRightView(pId as StandardPanelId)}
+                onCollapse={() => setRightOpen(false)}
+              >
+                {rightView === 'copilot' && (
                   <CopilotPanel
                     caseId={p.vaultName ?? undefined}
                     onCitationClick={(source) => {
                       const matching = p.files.find((f) => f.path.includes(source) || source.includes(f.name))
                       if (matching) p.onSelectFile(matching.path)
                     }}
+                    onNoteClick={(notePath) => p.onSelectFile(notePath)}
                   />
-                ) : (
+                )}
+                {rightView === 'proposals' && (
                   <ProposalPanel
                     caseId={p.vaultName ?? undefined}
                     onOpenCitation={(citation) => {
@@ -796,7 +805,18 @@ export function Workspace(p: WorkspaceProps) {
                     }}
                   />
                 )}
-              </div>
+                {rightView === 'inspector' && (
+                  <EdgeInspector />
+                )}
+                {rightView === 'changed' && (
+                  <WhatChangedPanel
+                    caseId={p.vaultName ?? undefined}
+                    onNavigateProposal={() => {
+                      setRightView('proposals')
+                    }}
+                  />
+                )}
+              </PanelHost>
             </aside>
           </>
         )}
