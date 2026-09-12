@@ -5,13 +5,9 @@ import type { VaultFile } from '../fs/vault'
 import { StatusBar } from './StatusBar'
 import { CopilotPanel } from '../copilot'
 import { AnalyseButton } from './AnalyseButton'
-import { onOpenFileAt, PanelHost, type PanelId } from '../workspace'
+import { onOpenFileAt } from '../workspace'
 import { ObsidianGraphView } from '../graph/ObsidianGraphView'
 import { parseGraph, DEFAULT_GRAPH_DATA } from '../graph'
-import { ProposalPanel } from '../proposals'
-import type { AnalysisResult } from '../proposals/types'
-import { EdgeInspector } from '../inspector'
-import { WhatChangedPanel } from '../changed'
 
 /* ------------------------------------------------------------------ *
  * Workspace — the Obsidian-style shell. One file, layout only.
@@ -86,20 +82,6 @@ export function Workspace(p: WorkspaceProps) {
     const saved = localStorage.getItem('sb_right_open')
     return saved !== null ? saved === 'true' : true
   })
-  const [activeRightPanel, setActiveRightPanel] = useState<PanelId>('copilot')
-  const [pendingProposalCount, setPendingProposalCount] = useState(0)
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
-  // Tracks a deliberate manual collapse so an incoming analysis/edge-select
-  // event doesn't immediately re-expand the rail against the user's wishes
-  // (docs/OVERHAUL_SPEC.md §A2, §G.27).
-  const lastManualCollapseRef = useRef<number>(0)
-  const setRightOpenManual = useCallback((next: boolean) => {
-    if (!next) lastManualCollapseRef.current = Date.now()
-    setRightOpen(next)
-  }, [])
-  const recentlyCollapsedByUser = useCallback(() => {
-    return Date.now() - lastManualCollapseRef.current < 3000
-  }, [])
   const [leftView, setLeftView] = useState<'files' | 'search' | 'bookmarks'>('files')
   const [internalView, setInternalView] = useState<ActiveView>(() => {
     return (localStorage.getItem('sb_active_view') as ActiveView) || 'editor'
@@ -152,27 +134,6 @@ function formatCaseDisplayName(id: string | null): string {
     }
     return DEFAULT_GRAPH_DATA
   }, [p.noteContents, p.vaultName])
-
-  // On a completed analysis, surface it: switch the right rail to Proposals
-  // (Law 2 review is the point of running an analysis) and badge the pending
-  // count, unless the user just deliberately collapsed the rail.
-  useEffect(() => {
-    const handleCaseAnalysed = (e: Event) => {
-      const detail = (e as CustomEvent<AnalysisResult>).detail
-      if (!detail) return
-      setAnalysisResult(detail)
-      const pending = (detail.new_connections || []).filter(
-        (proposal) => (proposal.status ?? 'proposed') === 'proposed'
-      ).length
-      setPendingProposalCount(pending)
-      if (!recentlyCollapsedByUser()) {
-        setActiveRightPanel('proposals')
-        if (!rightOpen) setRightOpenManual(true)
-      }
-    }
-    window.addEventListener('syndicate-brain:case-analysed', handleCaseAnalysed)
-    return () => window.removeEventListener('syndicate-brain:case-analysed', handleCaseAnalysed)
-  }, [rightOpen, recentlyCollapsedByUser, setRightOpenManual])
 
   useEffect(() => {
     return onOpenFileAt(({ path }) => {
@@ -381,16 +342,9 @@ function formatCaseDisplayName(id: string | null): string {
           <button
             type="button"
             className={`ws-ico${rightOpen ? ' is-active' : ''}`}
-            title={rightOpen ? 'Close Right Rail' : 'Open Copilot'}
-            aria-label="Toggle Right Rail"
-            onClick={() => {
-              if (rightOpen) {
-                setRightOpenManual(false)
-              } else {
-                setActiveRightPanel('copilot')
-                setRightOpenManual(true)
-              }
-            }}
+            title={rightOpen ? 'Close Copilot' : 'Open Copilot'}
+            aria-label="Toggle Copilot"
+            onClick={() => setRightOpen((v) => !v)}
           >
             <Svg d={I.copilot} />
           </button>
@@ -718,9 +672,9 @@ function formatCaseDisplayName(id: string | null): string {
                     <button
                       type="button"
                       className="ws-pane-action-btn"
-                      title="Open Right Rail"
-                      aria-label="Open Right Rail"
-                      onClick={() => setRightOpenManual(true)}
+                      title="Open Copilot"
+                      aria-label="Open Copilot"
+                      onClick={() => setRightOpen(true)}
                     >
                       <Svg d={I.panelRight} />
                     </button>
@@ -895,85 +849,43 @@ function formatCaseDisplayName(id: string | null): string {
                           setView('editor')
                         }
                       }}
-                      onSelectEdge={(_edgeId, edge) => {
-                        window.dispatchEvent(
-                          new CustomEvent('syndicate-brain:edge-selected', { detail: edge })
-                        )
-                        if (!recentlyCollapsedByUser()) {
-                          setActiveRightPanel('inspector')
-                          if (!rightOpen) setRightOpenManual(true)
-                        }
-                      }}
                     />
                   </div>
                 )}
               </div>
             </main>
 
-            {/* Right Rail — tabbed host: Copilot, Proposals (Law 2 review),
-                Inspector (Law 3 provenance), What Changed. Always mounted and
-                hidden (not unmounted) when collapsed, so panel state (an
-                in-progress copilot conversation, a fetched proposal list)
-                survives a collapse/expand cycle. */}
-            <PanelHost
-                className="ws-pane ws-pane-right"
-                isCollapsed={!rightOpen}
-                activePanel={activeRightPanel}
-                onSelectPanel={setActiveRightPanel}
-                collapseToggle={() => setRightOpenManual(false)}
-                panelList={[
-                  {
-                    id: 'copilot',
-                    label: 'Copilot',
-                    content: (
-                      <CopilotPanel
-                        caseId={p.vaultName || 'Case_01_Sonipat_Arms'}
-                        isCaseOpen={true}
-                        onClose={() => setRightOpenManual(false)}
-                        onCitationClick={(source) => {
-                          const matching = p.files.find((f) => f.path.includes(source) || source.includes(f.name))
-                          if (matching) p.onSelectFile(matching.path)
-                        }}
-                        onNoteClick={(notePath) => p.onSelectFile(notePath)}
-                      />
-                    ),
-                  },
-                  {
-                    id: 'proposals',
-                    label: 'Proposals',
-                    badge: pendingProposalCount > 0 ? pendingProposalCount : undefined,
-                    content: (
-                      <ProposalPanel
-                        caseId={p.vaultName || 'Case_01_Sonipat_Arms'}
-                        analysisResult={analysisResult}
-                        onOpenFile={(filePath) => {
-                          p.onSelectFile(filePath)
-                          setView('editor')
-                        }}
-                      />
-                    ),
-                  },
-                  {
-                    id: 'inspector',
-                    label: 'Inspector',
-                    content: <EdgeInspector />,
-                  },
-                  {
-                    id: 'changed',
-                    label: 'Changed',
-                    content: (
-                      <WhatChangedPanel
-                        caseId={p.vaultName || 'Case_01_Sonipat_Arms'}
-                        analysisResult={analysisResult}
-                        onOpenFile={(filePath) => {
-                          p.onSelectFile(filePath)
-                          setView('editor')
-                        }}
-                      />
-                    ),
-                  },
-                ]}
-              />
+            {/* Right Rail Pane — Dedicated Copilot Panel */}
+            {rightOpen && (
+              <aside className="ws-pane ws-pane-right ws-pane-copilot">
+                <div className="ws-pane-copilot-head">
+                  <div className="ws-copilot-title">
+                    <Svg d={I.copilot} />
+                    <span>Copilot</span>
+                  </div>
+                  <span className="ws-grow" />
+                  <button
+                    type="button"
+                    className="ws-pane-action-btn"
+                    title="Close Copilot"
+                    aria-label="Close Copilot"
+                    onClick={() => setRightOpen(false)}
+                  >
+                    <Svg d={I.x} />
+                  </button>
+                </div>
+                <CopilotPanel
+                  caseId={p.vaultName || 'Case_01_Sonipat_Arms'}
+                  isCaseOpen={true}
+                  onClose={() => setRightOpen(false)}
+                  onCitationClick={(source) => {
+                    const matching = p.files.find((f) => f.path.includes(source) || source.includes(f.name))
+                    if (matching) p.onSelectFile(matching.path)
+                  }}
+                  onNoteClick={(notePath) => p.onSelectFile(notePath)}
+                />
+              </aside>
+            )}
           </div>
 
           <StatusBar
