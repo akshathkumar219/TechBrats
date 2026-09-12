@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import type { VaultFile } from '../fs/vault'
+import { EmptyState } from '../states'
 
 interface GlobalSearchProps {
   isOpen: boolean
@@ -110,9 +111,17 @@ export function GlobalSearch({
         </div>
         <div ref={listRef} className="global-search-list">
           {!query.trim() ? (
-            <div className="global-search-empty">Type keywords to search across vault notes</div>
+            <EmptyState
+              compact
+              headline="Search Case Vault"
+              body="Type keywords to search across evidentiary records and entity notes."
+            />
           ) : matches.length === 0 ? (
-            <div className="global-search-empty">No matching note contents found</div>
+            <EmptyState
+              compact
+              headline="No Matching Records"
+              body="No records found matching the query."
+            />
           ) : (
             matches.map((match, idx) => (
               <div

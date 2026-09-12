@@ -117,12 +117,42 @@
   /* Motion */
   --t-fast: 120ms cubic-bezier(0.2,0,0,1);
   --t-med:  200ms cubic-bezier(0.2,0,0,1);
+
+  /* Surface & radius aliases */
+  --bg-surface:   var(--bg-raised);
+  --bg-active:    var(--bg-overlay);
+  --bg-hover:     var(--bg-raised);
+  --r-full:       9999px;
 }
 
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+/* Global focus-visible rings & interactive transitions */
+button,
+input,
+textarea,
+select,
+a,
+[tabindex],
+[role="button"],
+[role="tab"] {
+  transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
 }
 
 html, body, #root {
@@ -622,6 +652,8 @@ pre, code {
   height: 6px;
   border-radius: 50%;
   background-color: var(--ok);
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
 .status-indicator.unsaved {

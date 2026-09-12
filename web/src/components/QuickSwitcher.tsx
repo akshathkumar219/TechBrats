@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import type { VaultFile } from '../fs/vault'
+import { EmptyState } from '../states'
 
 interface QuickSwitcherProps {
   isOpen: boolean
@@ -87,7 +88,11 @@ export function QuickSwitcher({ isOpen, files, onSelectFile, onClose }: QuickSwi
         />
         <div ref={listRef} className="quick-switcher-list">
           {filtered.length === 0 ? (
-            <div className="quick-switcher-empty">No matching notes found</div>
+            <EmptyState
+              compact
+              headline="No Matching Notes"
+              body="No entity notes or records found matching the query."
+            />
           ) : (
             filtered.map((file, idx) => (
               <div

@@ -9,6 +9,7 @@ import { ProposalPanel } from '../proposals'
 import { EdgeInspector } from '../inspector'
 import { WhatChangedPanel } from '../changed'
 import { PanelHost, onOpenFileAt, type StandardPanelId } from '../workspace'
+import { EmptyState } from '../states'
 
 /* ------------------------------------------------------------------ *
  * Workspace — the Obsidian-style shell. One file, layout only.
@@ -757,9 +758,11 @@ export function Workspace(p: WorkspaceProps) {
             >
               {showEditor ? p.editor : (
                 <div className="ws-empty">
-                  <button type="button" onClick={p.onNewNote}>Create new note</button>
-                  <button type="button" onClick={p.onQuickSwitcher}>Go to file (⌘O)</button>
-                  <button type="button" onClick={() => closeTab(current.id)}>Close</button>
+                  <EmptyState
+                    headline="No Document Open"
+                    body="Select an entity note, FIR, or CDR from the case explorer or press ⌘K to open."
+                    action={{ label: 'Quick Switcher (⌘O)', onClick: p.onQuickSwitcher }}
+                  />
                 </div>
               )}
             </div>
@@ -787,7 +790,8 @@ export function Workspace(p: WorkspaceProps) {
               >
                 {rightView === 'copilot' && (
                   <CopilotPanel
-                    caseId={p.vaultName ?? undefined}
+                    caseId={p.vaultName ?? null}
+                    isCaseOpen={Boolean(p.vaultName)}
                     onCitationClick={(source) => {
                       const matching = p.files.find((f) => f.path.includes(source) || source.includes(f.name))
                       if (matching) p.onSelectFile(matching.path)

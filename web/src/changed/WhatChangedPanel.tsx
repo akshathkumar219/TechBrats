@@ -12,6 +12,7 @@ import {
 } from './types'
 import type { AnalysisResult } from '../proposals/types'
 import { CitationChip } from '../proposals'
+import { EmptyState, LoadingSkeleton } from '../states'
 import './changed.css'
 
 type FilterMode = 'all' | WhatChangedCategory
@@ -474,16 +475,17 @@ export function WhatChangedPanel({
 
       {/* Main Diff Content */}
       <main className="wc-content">
-        {totalVisibleCount === 0 ? (
-          <div className="wc-empty-state">
-            <div className="wc-empty-icon" aria-hidden="true">
-              ✓
-            </div>
-            <div className="wc-empty-title">No changes in selected filter</div>
-            <div className="wc-empty-desc">
-              No pending evidentiary modifications detected. The case vault matches registered inputs.
-            </div>
+        {isLoading || isRefreshing ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)', padding: 'var(--s3)' }}>
+            <LoadingSkeleton variant="card" />
+            <LoadingSkeleton variant="card" />
+            <LoadingSkeleton variant="card" />
           </div>
+        ) : totalVisibleCount === 0 ? (
+          <EmptyState
+            headline="No Changes in Selected Filter"
+            body="No pending evidentiary modifications detected. The case vault matches registered inputs."
+          />
         ) : (
           <>
             {/* SECTION: CONTRADICTIONS (High priority alibi conflicts) */}

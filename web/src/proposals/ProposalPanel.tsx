@@ -9,6 +9,7 @@ import type {
 import { ProposalCard } from './ProposalCard'
 import { CitationChip } from './CitationChip'
 import { DEFAULT_MOCK_ANALYSIS_RESULT } from './mockData'
+import { EmptyState, LoadingSkeleton } from '../states'
 import './proposals.css'
 
 export function ProposalPanel({
@@ -341,9 +342,23 @@ export function ProposalPanel({
 
       {/* Main Content: Three distinct sections */}
       <main className="proposal-panel-body">
-        {activeTab === 'pending' && (
+        {isLoading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)', padding: 'var(--s3)' }}>
+            <LoadingSkeleton variant="card" />
+            <LoadingSkeleton variant="card" />
+            <LoadingSkeleton variant="card" />
+          </div>
+        ) : proposals.length === 0 ? (
+          <EmptyState
+            headline="No proposals generated"
+            body="Run 'Analyse case' to detect candidate connections from evidentiary records."
+            action={{ label: 'Analyse case', onClick: fetchAnalysis }}
+          />
+        ) : (
           <>
-            {/* SECTION 1: NEW CONNECTIONS */}
+            {activeTab === 'pending' && (
+              <>
+                {/* SECTION 1: NEW CONNECTIONS */}
             <section className="proposal-section" aria-labelledby="heading-new-connections">
               <div className="proposal-section-head">
                 <div className="proposal-section-title-wrap">
@@ -358,15 +373,10 @@ export function ProposalPanel({
               </div>
 
               {pendingProposals.length === 0 ? (
-                <div className="proposal-empty-state">
-                  <span className="proposal-empty-icon" aria-hidden="true">
-                    ✓
-                  </span>
-                  <div className="proposal-empty-title">All proposed connections reviewed</div>
-                  <div className="proposal-empty-desc">
-                    No pending connections. Accepted links have been written to markdown notes under Law 3.
-                  </div>
-                </div>
+                <EmptyState
+                  headline="All proposed connections reviewed"
+                  body="No pending connections. Accepted links have been written to markdown notes under Law 3."
+                />
               ) : (
                 <div className="proposal-cards-list">
                   {pendingProposals.map((item) => (
@@ -418,10 +428,11 @@ export function ProposalPanel({
               </div>
 
               {filesToUpdate.length === 0 ? (
-                <div className="proposal-empty-state">
-                  <div className="proposal-empty-title">No note updates suggested</div>
-                  <div className="proposal-empty-desc">All existing notes are consistent with recent evidence.</div>
-                </div>
+                <EmptyState
+                  compact
+                  headline="No note updates suggested"
+                  body="All existing notes are consistent with recent evidence."
+                />
               ) : (
                 <div className="proposal-updates-list">
                   {filesToUpdate.map((item, idx) => (
@@ -517,12 +528,10 @@ export function ProposalPanel({
             </div>
 
             {acceptedProposals.length === 0 ? (
-              <div className="proposal-empty-state">
-                <div className="proposal-empty-title">No accepted AI links yet</div>
-                <div className="proposal-empty-desc">
-                  Proposals accepted from the Active tab will appear here with permanent provenance records.
-                </div>
-              </div>
+              <EmptyState
+                headline="No accepted AI links yet"
+                body="Proposals accepted from the Active tab will appear here with permanent provenance records."
+              />
             ) : (
               <div className="proposal-cards-list">
                 {acceptedProposals.map((item) => (
@@ -594,6 +603,8 @@ export function ProposalPanel({
               ))}
             </div>
           </section>
+        )}
+          </>
         )}
       </main>
     </div>

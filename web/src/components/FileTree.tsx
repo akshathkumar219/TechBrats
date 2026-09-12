@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef, type DragEvent, type KeyboardEv
 import type { VaultFile } from '../fs/vault'
 import { buildFileTree, type TreeNode } from '../lib/tree'
 import { IngestDropZone } from './IngestDropZone'
+import { EmptyState, LoadingSkeleton, ErrorState } from '../states'
 
 export interface FileTreeProps {
   files: VaultFile[]
@@ -391,33 +392,31 @@ export function FileTree({
       </div>
 
       {error && (
-        <div className="placeholder-content">
-          <p style={{ color: 'var(--danger)' }}>{error}</p>
-        </div>
+        <ErrorState
+          title="Case Vault Error"
+          message={error}
+        />
       )}
 
       {isLoading ? (
-        <div className="placeholder-content">
-          <p>Scanning case vault...</p>
+        <div style={{ padding: 'var(--s3)' }}>
+          <LoadingSkeleton variant="text" lines={6} />
         </div>
       ) : tree.length === 0 ? (
-        <div className="placeholder-content">
-          {reopenCandidateName && onReopenVault ? (
-            <>
-              <p>Previous vault found: <strong>{reopenCandidateName}</strong></p>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={onReopenVault}
-                style={{ marginTop: 'var(--s2)' }}
-              >
-                Reopen &ldquo;{reopenCandidateName}&rdquo;
-              </button>
-            </>
-          ) : (
-            <p>Click &ldquo;Open folder&rdquo; to load a vault.</p>
-          )}
-        </div>
+        reopenCandidateName && onReopenVault ? (
+          <EmptyState
+            compact
+            headline={`Vault "${reopenCandidateName}" detected`}
+            body="A previous case vault was detected on disk."
+            action={{ label: `Reopen "${reopenCandidateName}"`, onClick: onReopenVault }}
+          />
+        ) : (
+          <EmptyState
+            compact
+            headline="No Case Open"
+            body="Click 'Open Case' in the top bar to inspect files."
+          />
+        )
       ) : (
         <div className="tree-container">
           {tree.map((node) => renderNode(node, 0))}
