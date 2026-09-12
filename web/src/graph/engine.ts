@@ -16,12 +16,11 @@ import cytoscape, {
   type NodeSingular,
   type EdgeSingular,
   type ElementDefinition,
-  type StylesheetStyle,
 } from 'cytoscape'
 // @ts-expect-error cytoscape-cose-bilkent untyped
 import coseBilkent from 'cytoscape-cose-bilkent'
 
-import type { GraphData, EntityType } from './types.ts'
+import type { GraphData } from './types.ts'
 
 // Register cose-bilkent layout once safely
 let coseBilkentRegistered = false
@@ -33,284 +32,13 @@ export function registerCoseBilkent(): void {
 }
 registerCoseBilkent()
 
-/**
- * Design system tokens from docs/design-system.md §1 & §4.
- * Centralized token registry — no arbitrary hex codes in styling.
- */
-export const GRAPH_TOKENS = {
-  // Evidentiary semantic status
-  evidence: 'var(--evidence, #E8B04B)',
-  evidenceDim: 'var(--evidence-dim, #8A6B2E)',
-  evidenceBg: 'var(--evidence-bg, rgba(232, 176, 75, 0.18))',
-  hypothesis: 'var(--hypothesis, #C2569E)',
-  hypothesisBg: 'var(--hypothesis-bg, rgba(194, 86, 158, 0.18))',
-  danger: 'var(--danger, #D4574E)',
-  dangerBg: 'var(--danger-bg, rgba(212, 87, 78, 0.18))',
-  ok: 'var(--ok, #5FA774)',
-  info: 'var(--info, #5B8FC7)',
-
-  // Surfaces & lines
-  bgBase: 'var(--bg-base, #131519)',
-  border: 'var(--border, #2A2F36)',
-  borderStrong: 'var(--border-strong, #3A414A)',
-  borderFocus: 'var(--border-focus, #E8B04B)',
-
-  // Text
-  textPrimary: 'var(--text-primary, #E6E8EA)',
-  textBody: 'var(--text-body, #C4C9CF)',
-  textMuted: 'var(--text-muted, #8A9099)',
-  textFaint: 'var(--text-faint, #5A616B)',
-
-  // Entity type accents
-  ePerson: 'var(--e-person, #E8B04B)',
-  ePhone: 'var(--e-phone, #7FB3D5)',
-  eDevice: 'var(--e-device, #6FA8A0)',
-  eVehicle: 'var(--e-vehicle, #B08CD9)',
-  eLocation: 'var(--e-location, #8FBF7F)',
-  eTower: 'var(--e-tower, #5FA774)',
-  eOrg: 'var(--e-org, #D98C5F)',
-  eFir: 'var(--e-fir, #9AA3AD)',
-  eEvent: 'var(--e-event, #D4574E)',
-  eUnknown: 'var(--text-faint, #5A616B)',
-} as const
-
-/**
- * Resolves a CSS variable token to a concrete color value if needed.
- * Works seamlessly in both browser (reads computed style) and headless/Node environments.
- * Correctly handles nested parentheses such as `rgba(...)`.
- */
-export function resolveToken(token: string, container?: HTMLElement | null): string {
-  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const el = container || document.documentElement
-    const varMatch = token.match(/^var\((--[a-zA-Z0-9_-]+)/)
-    if (varMatch) {
-      const computed = getComputedStyle(el).getPropertyValue(varMatch[1]).trim()
-      if (computed) return computed
-    }
-  }
-
-  // Parse fallback value: var(--name, fallback)
-  if (token.startsWith('var(') && token.endsWith(')')) {
-    const commaIndex = token.indexOf(',')
-    if (commaIndex !== -1) {
-      return token.slice(commaIndex + 1, -1).trim()
-    }
-  }
-  return token
-}
-
-/**
- * Entity shapes mapping per design-system.md §4:
- * Person = circle/ellipse · Phone/identifier = rounded rectangle · Device = hexagon
- * Vehicle = pentagon · Tower = triangle · Location = diamond · Org = barrel/ring
- * FIR = rectangle · Event = star · Unknown = ellipse
- */
-export function getNodeShapeForType(type: EntityType | string): string {
-  const norm = String(type || '').toLowerCase().trim()
-  switch (norm) {
-    case 'person':
-      return 'ellipse'
-    case 'phone':
-    case 'identifier':
-    case 'imei':
-      return 'round-rectangle'
-    case 'device':
-      return 'hexagon'
-    case 'vehicle':
-      return 'pentagon'
-    case 'tower':
-      return 'triangle'
-    case 'location':
-      return 'diamond'
-    case 'org':
-    case 'organisation':
-    case 'organization':
-      return 'barrel'
-    case 'fir':
-    case 'doc':
-    case 'document':
-      return 'rectangle'
-    case 'event':
-      return 'star'
-    default:
-      return 'ellipse'
-  }
-}
-
-/**
- * Node color token mapping per design-system.md §4
- */
-export function getNodeColorTokenForType(type: EntityType | string): {
-  stroke: string
-  fill: string
-} {
-  const norm = String(type || '').toLowerCase().trim()
-  switch (norm) {
-    case 'person':
-      return { stroke: GRAPH_TOKENS.ePerson, fill: GRAPH_TOKENS.evidenceBg }
-    case 'phone':
-    case 'identifier':
-    case 'imei':
-      return { stroke: GRAPH_TOKENS.ePhone, fill: 'rgba(127, 179, 213, 0.18)' }
-    case 'device':
-      return { stroke: GRAPH_TOKENS.eDevice, fill: 'rgba(111, 168, 160, 0.18)' }
-    case 'vehicle':
-      return { stroke: GRAPH_TOKENS.eVehicle, fill: 'rgba(176, 140, 217, 0.18)' }
-    case 'tower':
-      return { stroke: GRAPH_TOKENS.eTower, fill: 'rgba(95, 167, 116, 0.18)' }
-    case 'location':
-      return { stroke: GRAPH_TOKENS.eLocation, fill: 'rgba(143, 191, 127, 0.18)' }
-    case 'org':
-    case 'organisation':
-    case 'organization':
-      return { stroke: GRAPH_TOKENS.eOrg, fill: 'rgba(217, 140, 95, 0.18)' }
-    case 'fir':
-    case 'doc':
-    case 'document':
-      return { stroke: GRAPH_TOKENS.eFir, fill: 'rgba(154, 163, 173, 0.18)' }
-    case 'event':
-      return { stroke: GRAPH_TOKENS.eEvent, fill: GRAPH_TOKENS.dangerBg }
-    default:
-      return { stroke: GRAPH_TOKENS.eUnknown, fill: 'rgba(90, 97, 107, 0.18)' }
-  }
-}
-
-/**
- * Builds the Cytoscape stylesheet adhering strictly to design-system.md §4.
- */
-export function createGraphStylesheet(container?: HTMLElement | null): StylesheetStyle[] {
-  const resolved = {
-    evidence: resolveToken(GRAPH_TOKENS.evidence, container),
-    evidenceBg: resolveToken(GRAPH_TOKENS.evidenceBg, container),
-    hypothesis: resolveToken(GRAPH_TOKENS.hypothesis, container),
-    danger: resolveToken(GRAPH_TOKENS.danger, container),
-    border: resolveToken(GRAPH_TOKENS.border, container),
-    textPrimary: resolveToken(GRAPH_TOKENS.textPrimary, container),
-    textFaint: resolveToken(GRAPH_TOKENS.textFaint, container),
-  }
-
-  return [
-    // Base node style
-    {
-      selector: 'node',
-      style: {
-        'label': 'data(label)',
-        'shape': 'data(shape)',
-        'background-color': resolved.evidenceBg,
-        'border-color': resolved.evidence,
-        'border-width': 1.5,
-        'width': 'data(size)',
-        'height': 'data(size)',
-        'color': resolved.textPrimary,
-        'font-family': 'Inter, system-ui, sans-serif',
-        'font-size': 12,
-        'text-valign': 'bottom',
-        'text-halign': 'center',
-        'text-margin-y': 6,
-        'min-zoomed-font-size': 8,
-        'transition-property': 'background-color, border-color, opacity, border-width',
-        'transition-duration': 0.15,
-      },
-    },
-    // Dynamic background and border color data attributes
-    {
-      selector: 'node[bgColor]',
-      style: {
-        'background-color': 'data(bgColor)',
-      },
-    },
-    {
-      selector: 'node[borderColor]',
-      style: {
-        'border-color': 'data(borderColor)',
-      },
-    },
-    // Unresolved node style (design-system & parser requirement)
-    {
-      selector: 'node[?isUnresolved]',
-      style: {
-        'border-style': 'dashed',
-        'border-color': resolved.textFaint,
-        'color': resolved.textFaint,
-        'opacity': 0.85,
-      },
-    },
-    // Selected node: 2px --evidence ring + outer glow
-    {
-      selector: 'node:selected',
-      style: {
-        'border-color': resolved.evidence,
-        'border-width': 3,
-        'overlay-color': resolved.evidence,
-        'overlay-opacity': 0.22,
-        'overlay-padding': 6,
-      },
-    },
-    // Base edge style: verified single source by default
-    {
-      selector: 'edge',
-      style: {
-        'width': 'data(weight)',
-        'line-color': resolved.evidence,
-        'line-opacity': 0.7,
-        'curve-style': 'bezier',
-        'target-arrow-shape': 'triangle',
-        'target-arrow-color': resolved.evidence,
-        'arrow-scale': 0.85,
-        'transition-property': 'line-color, opacity, width',
-        'transition-duration': 0.15,
-      },
-    },
-    // Record-derived edge (verified)
-    {
-      selector: 'edge[tier = "record-derived"]',
-      style: {
-        'line-color': resolved.evidence,
-        'target-arrow-color': resolved.evidence,
-        'line-style': 'solid',
-        'line-opacity': 0.85,
-      },
-    },
-    // AI-proposed edge (hypothesis): dashed, magenta (NON-EVIDENTIARY)
-    {
-      selector: 'edge[tier = "ai-proposed"], edge[?isAi]',
-      style: {
-        'line-color': resolved.hypothesis,
-        'target-arrow-color': resolved.hypothesis,
-        'line-style': 'dashed',
-        'line-dash-pattern': [6, 4],
-        'line-opacity': 0.9,
-      },
-    },
-    // Selected edge
-    {
-      selector: 'edge:selected',
-      style: {
-        'width': 3.5,
-        'line-color': resolved.evidence,
-        'target-arrow-color': resolved.evidence,
-        'line-opacity': 1.0,
-        'overlay-color': resolved.evidence,
-        'overlay-opacity': 0.2,
-        'overlay-padding': 4,
-      },
-    },
-    // Dimmed element (focus / local-graph mode) — 15% opacity
-    {
-      selector: '.sb-dimmed',
-      style: {
-        'opacity': 0.15,
-      },
-    },
-    // Hidden element (filtered out)
-    {
-      selector: '.sb-hidden',
-      style: {
-        'display': 'none',
-      },
-    },
-  ] as unknown as StylesheetStyle[]
-}
+export * from './styles.ts'
+import {
+  resolveToken,
+  getNodeShapeForType,
+  getNodeColorTokenForType,
+  createGraphStylesheet,
+} from './styles.ts'
 
 /**
  * Options for configuring the CytoscapeGraphEngine.
@@ -335,6 +63,10 @@ export interface EngineOptions {
    * Custom zoom sensitivity.
    */
   wheelSensitivity?: number
+  /**
+   * Initial visibility of investigative leads (AI-proposed edges). Default: true.
+   */
+  leadsVisible?: boolean
 }
 
 /**
@@ -376,6 +108,7 @@ export class CytoscapeGraphEngine {
   private currentRawData: GraphData = { nodes: [], edges: [] }
   private activeFilterPredicate: ((element: NodeSingular | EdgeSingular) => boolean) | null = null
   private activeTopNLimit: number | null = null
+  private leadsVisible = true
 
   constructor(container?: HTMLElement | null, data?: GraphData, options?: EngineOptions) {
     this.options = {
@@ -383,8 +116,10 @@ export class CytoscapeGraphEngine {
       animateLayout: options?.animateLayout ?? false,
       layoutIterations: options?.layoutIterations ?? 2500,
       wheelSensitivity: options?.wheelSensitivity ?? 1,
+      leadsVisible: options?.leadsVisible !== undefined ? options.leadsVisible : true,
     }
     this.activeTopNLimit = this.options.defaultTopNDegree
+    this.leadsVisible = this.options.leadsVisible
 
     if (container !== undefined) {
       this.initGraph(container, data)
@@ -549,6 +284,14 @@ export class CytoscapeGraphEngine {
       const seedX = Math.round(radius * Math.cos(theta) * 100) / 100
       const seedY = Math.round(radius * Math.sin(theta) * 100) / 100
 
+      const nodeClasses: string[] = [`type-${node.type}`]
+      if (node.isUnresolved) {
+        nodeClasses.push('unresolved')
+      }
+      if (node.role) {
+        nodeClasses.push(`role-${node.role}`)
+      }
+
       elementDefs.push({
         group: 'nodes',
         data: {
@@ -567,12 +310,48 @@ export class CytoscapeGraphEngine {
           identifiers: node.identifiers,
           metadata: node.metadata,
         },
+        classes: nodeClasses.join(' '),
         position: { x: seedX, y: seedY },
       })
     }
 
     // Map edges
     for (const edge of sortedEdges) {
+      const isAi = Boolean(edge.isAi || edge.aiProposalId || edge.tier === 'ai-proposed')
+      const isContradiction = Boolean(
+        (edge as unknown as Record<string, unknown>).isContradiction ||
+        (edge as unknown as Record<string, unknown>).isDisputed ||
+        (edge as unknown as Record<string, unknown>).status === 'contradiction' ||
+        (edge as unknown as Record<string, unknown>).status === 'disputed' ||
+        (edge as unknown as Record<string, unknown>).tier === 'contradiction' ||
+        (edge as unknown as Record<string, unknown>).tier === 'disputed'
+      )
+      const sourceCount = Array.isArray((edge as unknown as Record<string, unknown>).sources)
+        ? ((edge as unknown as Record<string, unknown>).sources as unknown[]).length
+        : Array.isArray((edge as unknown as Record<string, unknown>).citations)
+        ? ((edge as unknown as Record<string, unknown>).citations as unknown[]).length
+        : typeof (edge as unknown as Record<string, unknown>).sourceCount === 'number'
+        ? ((edge as unknown as Record<string, unknown>).sourceCount as number)
+        : (edge as unknown as Record<string, unknown>).corroborated
+        ? 2
+        : 1
+      const isMultiSource = sourceCount > 1
+
+      const edgeClasses: string[] = []
+      if (isAi) {
+        edgeClasses.push('ai-proposed', 'is-ai')
+      } else {
+        edgeClasses.push('record-derived')
+      }
+      if (isMultiSource) {
+        edgeClasses.push('multi-source', 'corroborated')
+      }
+      if (isContradiction) {
+        edgeClasses.push('contradiction', 'disputed')
+      }
+
+      const weight = isContradiction ? 2.0 : isAi ? 1.5 : (isMultiSource ? 2.5 : 1.5)
+
       elementDefs.push({
         group: 'edges',
         data: {
@@ -581,12 +360,19 @@ export class CytoscapeGraphEngine {
           target: edge.target,
           reason: edge.reason,
           citation: edge.citation,
-          isAi: edge.isAi,
+          isAi,
           aiProposalId: edge.aiProposalId,
-          tier: edge.tier,
+          tier: isContradiction
+            ? (((edge as unknown as Record<string, unknown>).tier as string) ?? 'record-derived')
+            : (isAi ? 'ai-proposed' : 'record-derived'),
           rawText: edge.rawText,
-          weight: edge.tier === 'ai-proposed' ? 1.5 : 2.0,
+          isDisputed: isContradiction,
+          isContradiction,
+          sourceCount,
+          isMultiSource,
+          weight,
         },
+        classes: edgeClasses.join(' '),
       })
     }
 
@@ -778,11 +564,18 @@ export class CytoscapeGraphEngine {
         }
       }
 
-      // Filter edges (hide if either endpoint is hidden, or if predicate rejects edge)
+      // Filter edges (hide if either endpoint is hidden, or if predicate rejects edge, or if leads are hidden)
       for (const edge of edges) {
         const sourceVisible = !edge.source().hasClass('sb-hidden')
         const targetVisible = !edge.target().hasClass('sb-hidden')
         let isVisible = sourceVisible && targetVisible
+
+        if (isVisible && !this.leadsVisible) {
+          const isAi = edge.hasClass('ai-proposed') || edge.hasClass('is-ai') || Boolean(edge.data('isAi'))
+          if (isAi) {
+            isVisible = false
+          }
+        }
 
         if (isVisible && this.activeFilterPredicate) {
           isVisible = this.activeFilterPredicate(edge)
@@ -795,6 +588,21 @@ export class CytoscapeGraphEngine {
         }
       }
     })
+  }
+
+  /**
+   * Toggles visibility of AI-proposed leads/edges (Leads layer toggle).
+   */
+  public setLeadsVisible(visible: boolean): void {
+    this.leadsVisible = visible
+    this.reapplyActiveFilters()
+  }
+
+  /**
+   * Returns current visibility state of AI-proposed leads.
+   */
+  public isLeadsVisible(): boolean {
+    return this.leadsVisible
   }
 
   /**
@@ -869,6 +677,13 @@ export class CytoscapeGraphEngine {
    * Access underlying Cytoscape Core instance if needed.
    */
   public getCy(): Core | null {
+    return this.cy
+  }
+
+  /**
+   * Alias for getCy() for test assertions.
+   */
+  public getUnderlyingCore(): Core | null {
     return this.cy
   }
 
