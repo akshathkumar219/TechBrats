@@ -2,12 +2,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { fsSupported } from './fs/vault'
 import { useVault } from './state/useVault'
 import { useNoteIndex } from './state/useNoteIndex'
-import { findBacklinks } from './lib/links'
-import { TitleBar } from './components/TitleBar'
 import { FileTree } from './components/FileTree'
 import { Editor } from './components/Editor'
-import { StatusBar } from './components/StatusBar'
-import { Backlinks } from './components/Backlinks'
+import { Workspace } from './components/Workspace'
 import { AppModals } from './components/AppModals'
 
 export function App() {
@@ -26,10 +23,6 @@ export function App() {
   } = useVault()
 
   const noteContents = useNoteIndex(files, activeFile, content)
-  const backlinks = useMemo(
-    () => findBacklinks(activeFile, files, noteContents),
-    [activeFile, files, noteContents]
-  )
 
   const commands = useMemo(
     () => [
@@ -80,43 +73,34 @@ export function App() {
 
   return (
     <>
-      <div className="app">
-        {/* 1. Title bar (40px) */}
-        <TitleBar
-          vaultName={vaultName} isLoading={isLoading}
-          reopenCandidateName={reopenCandidateName}
-          onOpenFolder={openVault} onReopenVault={reopenVault}
-          onNewNote={() => setIsNoteModalOpen(true)}
-          onNewFolder={() => setIsFolderModalOpen(true)}
-        />
-
-        {/* 2. Left rail (240px) */}
-        <FileTree
-          files={files} folders={folders} selectedPath={activeFile?.path ?? null}
-          reopenCandidateName={reopenCandidateName}
-          onSelectFile={selectFile} onReopenVault={reopenVault}
-          isLoading={isLoading} error={error}
-        />
-
-        {/* 3. Centre (flex) - Split view with debounced autosave */}
-        <Editor
-          content={content} activeFile={activeFile} files={files}
-          isPreviewOnly={isPreviewOnly} onChange={updateContent}
-          onNavigateWikiLink={navigateWikiLink}
-        />
-
-        {/* 4. Right rail (320px) */}
-        <Backlinks
-          activeFile={activeFile} backlinks={backlinks} onSelectFile={selectFile}
-        />
-
-        {/* 5. Status bar (24px) */}
-        <StatusBar
-          filePath={activeFile ? activeFile.path : (vaultName ? `${files.length} notes found` : null)}
-          wordCount={wordCount}
-          saveStatus={saveStatus}
-        />
-      </div>
+      <Workspace
+        vaultName={vaultName}
+        files={files}
+        activeFile={activeFile}
+        wordCount={wordCount}
+        saveStatus={saveStatus}
+        onSelectFile={(path) => void selectFile(path)}
+        onOpenVault={() => void openVault()}
+        onNewNote={() => setIsNoteModalOpen(true)}
+        onNewFolder={() => setIsFolderModalOpen(true)}
+        onQuickSwitcher={() => setIsQuickSwitcherOpen(true)}
+        onSearch={() => setIsGlobalSearchOpen(true)}
+        sidebar={
+          <FileTree
+            files={files} folders={folders} selectedPath={activeFile?.path ?? null}
+            reopenCandidateName={reopenCandidateName}
+            onSelectFile={selectFile} onReopenVault={reopenVault}
+            isLoading={isLoading} error={error}
+          />
+        }
+        editor={
+          <Editor
+            content={content} activeFile={activeFile} files={files}
+            isPreviewOnly={isPreviewOnly} onChange={updateContent}
+            onNavigateWikiLink={navigateWikiLink}
+          />
+        }
+      />
 
       <AppModals
         isCommandPaletteOpen={isCommandPaletteOpen}

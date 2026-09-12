@@ -141,6 +141,7 @@ html, body, #root {
 .editor-pane, .preview-pane {
   flex: 1;
   height: 100%;
+  min-width: 0;
   overflow-y: auto;
   padding: var(--s4);
   display: flex;
@@ -149,6 +150,7 @@ html, body, #root {
 
 .editor-pane {
   border-right: 1px solid var(--border);
+  overflow: hidden;          /* CM6 manages its own scroller */
 }
 
 .pane-inner {
@@ -489,21 +491,25 @@ pre, code {
   gap: var(--s2);
 }
 
-.editor-textarea {
+/* ── CodeMirror 6 host ──────────────────────────────────────────────────
+   The editor fills the pane; CM6 owns its own scrolling. Colours and fonts
+   come from editor/theme.ts, which reads the same tokens as everything else. */
+.cm-host {
   width: 100%;
   height: 100%;
-  background-color: transparent;
-  color: var(--text-primary);
-  border: none;
-  outline: none;
-  resize: none;
-  font-family: var(--font-mono);
-  font-size: var(--fs-md);
-  line-height: 1.65;
+  overflow: hidden;
 }
 
-.editor-textarea::placeholder {
-  color: var(--text-faint);
+.cm-host .cm-editor {
+  height: 100%;
+}
+
+.cm-host .cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-host .cm-scroller {
+  padding-bottom: var(--s6);
 }
 
 .preview-content {
