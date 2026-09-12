@@ -21,6 +21,7 @@ import brain.mocks as mocks
 from brain.ingest import router as ingest_router
 from brain.linker import router as proposal_router
 from brain.cdr.router import router as cdr_router
+from brain.crosscase import router as crosscase_router
 
 app = FastAPI(
     title="SyndicateBrain API",
@@ -40,6 +41,7 @@ app.add_middleware(
 app.include_router(ingest_router)
 app.include_router(proposal_router)
 app.include_router(cdr_router)
+app.include_router(crosscase_router)
 
 
 @app.get("/api/cases", response_model=list[CaseSummary])
@@ -90,11 +92,6 @@ def get_case_integrity(
     from brain.integrity import get_case_integrity as real_get_case_integrity
     return real_get_case_integrity(case_path=case_path, case_id=case_id)
 
-
-@app.get("/api/crosscase/hits", response_model=CrossCaseResponse)
-def get_crosscase_hits():
-    """Deterministic scan for identifiers appearing across multiple cases."""
-    return mocks.get_crosscase_hits()
 
 
 @app.get("/api/doc/{id}", response_model=Doc)

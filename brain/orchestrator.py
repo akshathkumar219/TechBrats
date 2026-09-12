@@ -327,6 +327,12 @@ def run_fan_out_analysis(
         analyzed_at=datetime.now(timezone.utc).isoformat(),
     )
 
+    try:
+        from brain.crosscase import augment_analysis_result
+        result = augment_analysis_result(result, case_id_or_path=case_dir)
+    except Exception as exc:
+        logger.debug(f"Crosscase augmentation skipped: {exc}")
+
     logger.info(
         f"Orchestrator completed for {case_name}: "
         f"{len(surviving_proposals)} proposals retained, {len(dropped)} dropped by Law 4 validator."
