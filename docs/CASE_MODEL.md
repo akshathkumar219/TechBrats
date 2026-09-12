@@ -188,13 +188,17 @@ are logged to `07_AI_Synthesis/decisions.jsonl` and never re-proposed identicall
 ## 7. The model
 
 `brain/llm/client.py` is a **provider interface**, not a Gemini client. Two
-implementations behind it: Gemini Flash (default, for build speed) and Ollama
-(local). Switching is one line in `Case_Config.yaml`.
+implementations behind it: **Ollama (the default — `provider: ollama`)** and
+Gemini Flash. Switching is one line in `Case_Config.yaml`.
 
 This is not neatness for its own sake. The pitch is an offline police
-workstation; "it runs fully local for deployment, we're on Flash for iteration
-speed" is a true sentence that survives the obvious question. Keep the local
-path working.
+workstation, and running local means that claim is simply true — nothing leaves
+the machine, and the demo does not depend on venue wifi.
+
+The cost is quality and speed: a small local model doing schema-valid JSON across
+five fan-out agents is the highest-variance thing in this build. Keep a Gemini
+key in `Case_Config.yaml` as a parachute. If local output is unusable by W10,
+flip the provider — losing the offline line beats losing the feature.
 
 Model calls are JSON mode, temperature 0, Pydantic-validated, exactly one retry.
 Every generated sentence carries `^[source_id]` or the validator drops it.
