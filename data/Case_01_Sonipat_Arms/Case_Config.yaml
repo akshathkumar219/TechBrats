@@ -1,0 +1,9 @@
+case_id: Case_01_Sonipat_Arms
+case_name: Sonipat Arms & Extortion Syndicate
+created: '2026-02-14T10:00:00Z'
+model_provider: ollama
+model_name: llama3
+resolution_thresholds:
+  phonetic: 0.85
+  temporal_window_hours: 48
+tool_version: 0.1.0
