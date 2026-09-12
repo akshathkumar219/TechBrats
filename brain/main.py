@@ -19,6 +19,8 @@ from brain.schemas import (
 )
 import brain.mocks as mocks
 from brain.ingest import router as ingest_router
+from brain.linker import router as proposal_router
+from brain.cdr.router import router as cdr_router
 
 app = FastAPI(
     title="SyndicateBrain API",
@@ -36,6 +38,8 @@ app.add_middleware(
 )
 
 app.include_router(ingest_router)
+app.include_router(proposal_router)
+app.include_router(cdr_router)
 
 
 @app.get("/api/cases", response_model=list[CaseSummary])

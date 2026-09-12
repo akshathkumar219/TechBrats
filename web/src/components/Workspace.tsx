@@ -1,10 +1,11 @@
 import {
   useState, useEffect, useRef, useCallback, type ReactNode, type PointerEvent as RPointerEvent,
 } from 'react'
-import type React from 'react'
 import type { VaultFile } from '../fs/vault'
 import { StatusBar } from './StatusBar'
 import { TitleBar, type ActiveView } from './TitleBar'
+import { CopilotPanel } from '../copilot'
+import { ProposalPanel } from '../proposals'
 
 /* ------------------------------------------------------------------ *
  * Workspace — the Obsidian-style shell. One file, layout only.
@@ -365,6 +366,7 @@ const I = {
   plus: 'M12 5v14|M5 12h14',
   x: 'M6 6l12 12|M18 6L6 18',
   copilot: 'M12 4a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-4a3 3 0 0 1 3-3h1V8a4 4 0 0 1 4-4z|M9.5 14h.01|M14.5 14h.01',
+  proposals: 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2|M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z|M9 14l2 2 4-4',
   graph: 'M6 3a3 3 0 1 0 0 6 3 3 0 1 0 0-6|M18 3a3 3 0 1 0 0 6 3 3 0 1 0 0-6|M12 15a3 3 0 1 0 0 6 3 3 0 1 0 0-6|M9 6h6|M7.5 8.5l3 7|M16.5 8.5l-3 7',
   settings: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6|M4 12h2|M18 12h2|M12 4v2|M12 18v2',
   help: 'M9.5 9a2.5 2.5 0 1 1 3 2.5V13|M12 16.5h.01|M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18',
@@ -387,75 +389,6 @@ function IconBtn(props: {
 interface Tab { id: string; path: string | null }
 let tabSeq = 0
 const newTab = (path: string | null = null): Tab => ({ id: `t${++tabSeq}`, path })
-
-/* ---------------------------- copilot ---------------------------- */
-interface ChatMsg { id: string; role: 'user' | 'bot'; text: string }
-let msgSeq = 0
-
-interface CopilotProps {
-  messages: ChatMsg[]
-  setMessages: React.Dispatch<React.SetStateAction<ChatMsg[]>>
-  draft: string
-  setDraft: (v: string) => void
-}
-
-function Copilot({ messages, setMessages, draft, setDraft }: CopilotProps) {
-  const logRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight })
-  }, [messages])
-
-  const send = () => {
-    const text = draft.trim()
-    if (!text) return
-    const user: ChatMsg = { id: `m${++msgSeq}`, role: 'user', text }
-    const bot: ChatMsg = {
-      id: `m${++msgSeq}`, role: 'bot',
-      text: 'Copilot is not wired to a model yet — this is a local echo.\n\nYou said: ' + text,
-    }
-    setMessages((prev) => [...prev, user])
-    setDraft('')
-    window.setTimeout(() => setMessages((prev) => [...prev, bot]), 250)
-  }
-
-  return (
-    <div className="ws-chat">
-      <div className="ws-chat-log" ref={logRef}>
-        {messages.length === 0 ? (
-          <div className="ws-chat-empty">
-            <p>Ask Copilot about the open note.</p>
-            <p style={{ marginTop: 'var(--s2)', fontSize: 'var(--fs-sm)' }}>
-              Not connected to a model yet.
-            </p>
-          </div>
-        ) : (
-          messages.map((m) => (
-            <div key={m.id} className={`ws-msg is-${m.role}`}>{m.text}</div>
-          ))
-        )}
-      </div>
-      <form
-        className="ws-chat-form"
-        onSubmit={(e) => { e.preventDefault(); send() }}
-      >
-        <textarea
-          className="ws-chat-input"
-          rows={1}
-          value={draft}
-          placeholder="Message Copilot..."
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
-          }}
-        />
-        <button type="submit" className="ws-send" disabled={!draft.trim()} title="Send">
-          <Svg d={I.send} />
-        </button>
-      </form>
-    </div>
-  )
-}
 
 /* ---------------------------- resize ---------------------------- */
 function useResizer(set: (px: number) => void, from: 'left' | 'right') {
@@ -526,6 +459,7 @@ export function Workspace(p: WorkspaceProps) {
     return 300
   })
   const [leftView, setLeftView] = useState<'files' | 'search' | 'bookmarks'>('files')
+  const [rightView, setRightView] = useState<'copilot' | 'proposals'>('copilot')
   const [internalView, setInternalView] = useState<ActiveView>('editor')
   const activeView = p.activeView ?? internalView
   const setView = useCallback(
@@ -563,9 +497,6 @@ export function Workspace(p: WorkspaceProps) {
   useEffect(() => {
     localStorage.setItem('sb_right_w', String(rightW))
   }, [rightW])
-
-  const [chat, setChat] = useState<ChatMsg[]>([])
-  const [chatDraft, setChatDraft] = useState('')
 
   const [tabs, setTabs] = useState<Tab[]>(() => [newTab()])
   const [activeTab, setActiveTab] = useState<string>(() => tabs[0].id)
@@ -675,8 +606,16 @@ export function Workspace(p: WorkspaceProps) {
           <IconBtn icon={I.bookmark} label="Bookmarks" active={leftOpen && leftView === 'bookmarks'}
             onClick={() => { setLeftView('bookmarks'); setLeftOpen(true) }} />
           <IconBtn icon={I.newNote} label="New note" onClick={p.onNewNote} />
-          <IconBtn icon={I.copilot} label="Toggle Copilot" active={rightOpen}
-            onClick={() => setRightOpen((v) => !v)} />
+          <IconBtn icon={I.copilot} label="Copilot" active={rightOpen && rightView === 'copilot'}
+            onClick={() => {
+              if (rightOpen && rightView === 'copilot') setRightOpen(false)
+              else { setRightView('copilot'); setRightOpen(true) }
+            }} />
+          <IconBtn icon={I.proposals} label="Review Proposals" active={rightOpen && rightView === 'proposals'}
+            onClick={() => {
+              if (rightOpen && rightView === 'proposals') setRightOpen(false)
+              else { setRightView('proposals'); setRightOpen(true) }
+            }} />
           <div className="ws-ribbon-spacer" />
           <IconBtn icon={I.settings} label="Settings (not wired)" disabled />
         </nav>
@@ -791,22 +730,72 @@ export function Workspace(p: WorkspaceProps) {
           </div>
         </main>
 
-        {/* copilot */}
+        {/* right rail: Copilot and Proposals */}
         {rightOpen && (
           <>
             <div className={`ws-handle${rightDrag.dragging ? ' is-dragging' : ''}`}
               onPointerDown={rightDrag.onPointerDown} />
             <aside className="ws-pane ws-pane-right" style={{ width: rightW, flex: `0 0 ${rightW}px` }}>
-              <div className="ws-pane-head">
-                <Svg d={I.copilot} />
-                <span className="ws-pane-title">Copilot</span>
+              <div className="ws-pane-head" style={{ gap: 'var(--s2)' }}>
+                <button
+                  type="button"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--s1)',
+                    fontSize: 'var(--fs-sm)',
+                    fontWeight: rightView === 'copilot' ? 600 : 400,
+                    color: rightView === 'copilot' ? 'var(--accent)' : 'var(--text-muted)',
+                    borderBottom: rightView === 'copilot' ? '2px solid var(--accent)' : '2px solid transparent',
+                    padding: '0 var(--s2)',
+                    height: '100%',
+                  }}
+                  onClick={() => setRightView('copilot')}
+                >
+                  <Svg d={I.copilot} />
+                  <span>Copilot</span>
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--s1)',
+                    fontSize: 'var(--fs-sm)',
+                    fontWeight: rightView === 'proposals' ? 600 : 400,
+                    color: rightView === 'proposals' ? 'var(--hypothesis, var(--accent))' : 'var(--text-muted)',
+                    borderBottom: rightView === 'proposals' ? '2px solid var(--hypothesis, var(--accent))' : '2px solid transparent',
+                    padding: '0 var(--s2)',
+                    height: '100%',
+                  }}
+                  onClick={() => setRightView('proposals')}
+                >
+                  <Svg d={I.proposals} />
+                  <span>Proposals</span>
+                </button>
                 <span className="ws-grow" />
-                <IconBtn icon={I.panelRight} label="Collapse Copilot"
+                <IconBtn icon={I.panelRight} label="Collapse right rail"
                   onClick={() => setRightOpen(false)} />
               </div>
               <div className="ws-pane-body" style={{ overflow: 'hidden' }}>
-                <Copilot messages={chat} setMessages={setChat}
-                  draft={chatDraft} setDraft={setChatDraft} />
+                {rightView === 'copilot' ? (
+                  <CopilotPanel
+                    caseId={p.vaultName ?? undefined}
+                    onCitationClick={(source) => {
+                      const matching = p.files.find((f) => f.path.includes(source) || source.includes(f.name))
+                      if (matching) p.onSelectFile(matching.path)
+                    }}
+                  />
+                ) : (
+                  <ProposalPanel
+                    caseId={p.vaultName ?? undefined}
+                    onOpenCitation={(citation) => {
+                      const source = citation.source_doc_id
+                      const matching = p.files.find((f) => f.path.includes(source) || source.includes(f.name))
+                      if (matching) p.onSelectFile(matching.path)
+                    }}
+                  />
+                )}
               </div>
             </aside>
           </>
