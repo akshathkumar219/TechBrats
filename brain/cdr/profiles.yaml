@@ -1,0 +1,59 @@
+# Telco CDR column mapping profiles for SyndicateBrain (SIH26189).
+# Profiles map telco-specific CSV column headers to canonical internal fields:
+# - calling_party: MSISDN of calling party (A-party)
+# - called_party: MSISDN of called party (B-party)
+# - call_date_time: timestamp of call start (parsed to UTC ISO datetime)
+# - duration: duration in seconds
+# - call_type: call type (MOC, MTC, SMS, etc.)
+# - imei: handset International Mobile Equipment Identity
+# - imsi: SIM International Mobile Subscriber Identity
+# - first_cgi: initial Cell Global Identifier (tower/cell latch)
+# - tac: Type Allocation Code
+
+airtel:
+  name: "Airtel"
+  date_format: "%d/%m/%Y %H:%M:%S"
+  columns:
+    calling_party: "Calling Party"
+    called_party: "Called Party"
+    call_date_time: "Call Date Time"
+    duration: "Duration(s)"
+    call_type: "Call Type"
+    imei: "IMEI"
+    imsi: "IMSI"
+    first_cgi: "First CGI"
+    tac: "TAC"
+  header_mapping:
+    "Calling Party": "calling_party"
+    "Called Party": "called_party"
+    "Call Date Time": "call_date_time"
+    "Duration(s)": "duration"
+    "Call Type": "call_type"
+    "IMEI": "imei"
+    "IMSI": "imsi"
+    "First CGI": "first_cgi"
+    "TAC": "tac"
+
+jio:
+  name: "Jio"
+  date_format: "%d/%m/%Y %H:%M:%S"
+  columns:
+    calling_party: "Calling_Number"
+    called_party: "Called_Number"
+    call_date_time: "Call_Start_Time"
+    duration: "Duration_Sec"
+    call_type: "Type"
+    imei: "IMEI"
+    imsi: "IMSI"
+    first_cgi: "Cell_ID"
+    tac: "TAC"
+  header_mapping:
+    "Calling_Number": "calling_party"
+    "Called_Number": "called_party"
+    "Call_Start_Time": "call_date_time"
+    "Duration_Sec": "duration"
+    "Type": "call_type"
+    "IMEI": "imei"
+    "IMSI": "imsi"
+    "Cell_ID": "first_cgi"
+    "TAC": "tac"
