@@ -644,6 +644,13 @@ def rebuild_index_endpoint(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+# Import incremental module to register /api/index/refresh on router
+try:
+    import brain.index.incremental  # noqa: F401
+except ImportError:
+    pass
+
+
 if __name__ == "__main__":
     import sys
 
