@@ -1,4 +1,4 @@
-.PHONY: dev install test
+.PHONY: dev install test reset
 
 install:
 	python3 -m pip install -r requirements.txt
@@ -13,3 +13,6 @@ dev:
 
 test:
 	python3 -m pytest tests/ -v
+
+reset:
+	python3 scripts/reset.py $(ARGS)
